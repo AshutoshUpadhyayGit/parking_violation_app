@@ -1,0 +1,50 @@
+<table class="table table-striped align-middle">
+  <thead class="table-light">
+    <tr>
+      <th>#</th>
+      <th>Timestamp</th>
+      <th>Vehicle No</th>
+      <th>Owner</th>
+      <th>Flat No</th>
+      <th>Slot</th>
+      <th>Fine (₹)</th>
+      <th>Status</th>
+      <th>Images</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% if actioned_records %}
+    {% for r in actioned_records %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ r.timestamp }}</td>
+        <td>{{ r.detected_number }}</td>
+        <td>{{ r.Owner or '—' }}</td>
+        <td>{{ r.FlatNo or '—' }}</td>
+        <td>{{ r.parked_slot }}</td>
+        <td>{{ r.fine }}</td>
+        <td>
+          {% if r.Status == 'Verified' %}
+            <span class="badge bg-success">Verified</span>
+          {% elif r.Status == 'Dismissed' %}
+            <span class="badge bg-secondary">Dismissed</span>
+          {% else %}
+            <span class="badge bg-light text-dark">{{ r.Status }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if r.image_paths and r.image_paths|length > 0 %}
+            {% for img in r.image_paths %}
+              <img src="{{ img }}" class="img-thumbnail" style="width:60px; height:60px; cursor:pointer;" onclick="showImage('{{ img }}')">
+            {% endfor %}
+          {% else %}
+            <span class="text-muted">No image</span>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  {% else %}
+    <tr><td colspan="9" class="text-center text-muted">No actioned records</td></tr>
+  {% endif %}
+  </tbody>
+</table>

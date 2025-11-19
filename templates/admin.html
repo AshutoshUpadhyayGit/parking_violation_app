@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Admin Dashboard — TenX Habitat</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: linear-gradient(180deg,#f6f8fb 0%,#eef3ff 100%);
+      font-family: Inter, system-ui, "Segoe UI", Roboto;
+    }
+    .content {
+      max-width: 1300px;
+      margin: 2rem auto;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(13,110,253,0.08);
+      padding: 2rem;
+    }
+    img.thumb {
+      width: 70px;
+      border-radius: 8px;
+      margin-right: 4px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    img.thumb:hover {
+      transform: scale(1.1);
+    }
+    .section-title {
+      font-weight: 600;
+      margin-top: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .disabled-input {
+      background-color: #f8f9fa;
+      pointer-events: none;
+      opacity: 0.7;
+    }
+    /* ✅ ADD THIS AT THE BOTTOM OF STYLE BLOCK */
+    .is-invalid {
+      border: 2px solid #dc3545 !important;
+      box-shadow: 0 0 8px rgba(220,53,69,0.5) !important;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+    <h3 class="fw-bold text-primary">Admin Dashboard — TenX Habitat</h3>
+    <div>
+      <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm me-2">Home</a>
+      <a href="{{ url_for('watchman_login') }}" class="btn btn-outline-success btn-sm me-2">Watchman Panel</a>
+      <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">Logout</a>
+    </div>
+  </div>
+
+  <!-- Dashboard Content -->
+  <div class="content">
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs mb-4">
+      <li class="nav-item">
+        <a class="nav-link {% if active_tab == 'pending' %}active{% endif %}"
+           href="{{ url_for('admin_dashboard') }}">Pending / Unresolved</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if active_tab == 'actioned' %}active{% endif %}"
+           href="{{ url_for('admin_actioned') }}">Actioned / Resolved</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if active_tab == 'clamped' %}active{% endif %}"
+           href="{{ url_for('admin_clamped') }}"> Unknown / Unregistered Vehicles</a>
+      </li>
+    </ul>
+
+    <!-- Section Rendering -->
+    {% if active_tab == 'pending' %}
+      <h5 class="section-title text-primary">🚗 Pending / Unresolved Violations</h5>
+      {% include 'partials/pending_table.html' %}
+    {% elif active_tab == 'actioned' %}
+      <h5 class="section-title text-success">✅ Actioned / Resolved Records</h5>
+      {% include 'partials/actioned_table.html' %}
+    {% elif active_tab == 'clamped' %}
+      <h5 class="section-title text-danger">🚫 Unknown / Unregistered Vehicles</h5>
+      {% include 'partials/clamped_table.html' %}
+    {% endif %}
+  </div>
+</div>
+
+<!-- IMAGE PREVIEW MODAL -->
+<div class="modal fade" id="imageModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <img id="previewImage" src="" class="img-fluid rounded" alt="Vehicle Image">
+    </div>
+  </div>
+</div>
+
+<!-- ASSIGN / CLAMP MODAL -->
+<div class="modal fade" id="assignModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('assign_owner') }}">
+        <div class="modal-header">
+          <h5 class="modal-title">Assign Owner / Clamp Vehicle</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Full Vehicle Number</label>
+            <input type="text" class="form-control" name="vehicle_no_full" id="vehicle_no_full"
+                   placeholder="e.g. MH03AA1111" required onblur="autofillOwnerDetails()">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Vehicle Type</label>
+            <select class="form-select" name="vehicle_type" id="vehicle_type">
+              <option value="Car">Car</option>
+              <option value="Bike">Bike</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Owner Name</label>
+            <input type="text" class="form-control" name="owner_name" id="owner_name" placeholder="Enter owner name">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Flat No</label>
+            <input type="text" class="form-control" name="flat_no" id="flat_no" placeholder="e.g. B-302">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Allotted Slot</label>
+            <input type="text" class="form-control" name="slot" id="slot" placeholder="e.g. P5">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Owner Contact</label>
+            <input type="text" class="form-control"
+                   name="owner_contact"
+                   id="owner_contact_assign"
+                   required
+                   placeholder="Enter contact number">
+          </div>
+
+          <div class="form-check mt-3">
+            <input class="form-check-input" type="checkbox" name="unknown_vehicle" id="unknown_vehicle">
+            <label class="form-check-label fw-semibold" for="unknown_vehicle">
+              🚫 Clamp Or Unknown Vehicle (No Resident Owner)
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 🌟 REGISTER VEHICLE MODAL -->
+<div class="modal fade" id="registerVehicleModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('register_vehicle') }}">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">Register New Vehicle</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body">
+
+          <div class="mb-3">
+            <label class="form-label">Full Vehicle Number</label>
+            <input type="text" class="form-control"
+                   name="vehicle_no_full"
+                   id="register_vehicle_no_full"
+                   required
+                   placeholder="MH03AB1234">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Owner Name</label>
+            <input type="text" class="form-control"
+                   name="owner_name"
+                   id="owner_name_register"
+                   required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Owner Contact</label>
+            <input type="text" class="form-control"
+                   name="owner_contact"
+                   id="owner_contact_register"
+                   required
+                   placeholder="Enter contact number">
+          </div>
+
+
+
+          <div class="mb-3">
+            <label class="form-label">Flat No</label>
+            <input type="text" class="form-control"
+                   name="flat_no"
+                   id="flat_no_register"
+                   required
+                   placeholder="VISTA-3206 / VISITOR">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Vehicle Type</label>
+            <select class="form-select"
+                    name="vehicle_type"
+                    required>
+              <option value="">Select Type</option>
+              <option value="Car">Car</option>
+              <option value="Bike">Bike</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Allotted Slot</label>
+            <input type="text" class="form-control"
+                   name="slot"
+                   id="slot_register"
+                   required
+                   placeholder="G90">
+          </div>
+
+        </div>
+
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary" id="register_submit_btn">Register</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // Show enlarged image
+  function showImage(src) {
+    const imgModal = new bootstrap.Modal(document.getElementById('imageModal'));
+    document.getElementById('previewImage').src = src;
+    imgModal.show();
+  }
+
+  // Open Assign/Clamp modal
+  // Accepts optional third param 'source' - e.g. 'unknown' when opening from Unknown tab
+  function openAssignModal(vehicle_no, parked_slot, source='normal') {
+    // Modal fields (assign modal uses these ids)
+    const vehicleEl = document.getElementById('vehicle_no_full');
+    const fineEl = document.getElementById('fine');
+    const unknownCheckbox = document.getElementById('unknown_vehicle');
+    const ownerContactEl = document.getElementById('owner_contact_assign');
+
+    // Prefill vehicle and parked slot (parked_slot may be empty)
+    if (vehicleEl) vehicleEl.value = vehicle_no || '';
+    if (fineEl) fineEl.value = '';
+
+    // If opened from UNKNOWN tab -> hide the "unknown_vehicle" checkbox
+    // else ensure it's visible and unchecked
+    if (source === 'unknown') {
+      if (unknownCheckbox) {
+        unknownCheckbox.checked = false;
+        unknownCheckbox.closest('.form-check').style.display = 'none';
+      }
+    } else {
+      if (unknownCheckbox) {
+        unknownCheckbox.checked = false;
+        unknownCheckbox.closest('.form-check').style.display = '';
+      }
+    }
+
+    // Ensure relevant fields are enabled
+    enableFields(true);
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('assignModal'));
+    modal.show();
+
+    // Attempt to autofill owner details (if registered)
+    try { autofillOwnerDetails(); } catch (e) { console.warn('autofill error', e); }
+  }
+
+  // Clamp toggle logic (only used when checkbox is visible)
+  document.addEventListener("DOMContentLoaded", function() {
+    const clampBox = document.getElementById('unknown_vehicle');
+    if (clampBox) {
+      clampBox.addEventListener('change', function() {
+        if (this.checked) {
+          enableFields(false);
+          const fineEl = document.getElementById('fine');
+          if (fineEl) fineEl.value = 1000;
+        } else {
+          enableFields(true);
+          const fineEl = document.getElementById('fine');
+          if (fineEl) fineEl.value = '';
+        }
+      });
+    }
+  });
+
+  // Disable non-needed fields when clamped
+  function enableFields(enable) {
+    ['owner_name', 'flat_no', 'slot', 'owner_contact_assign'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.disabled = !enable;
+      el.classList.toggle('disabled-input', !enable);
+    });
+  }
+
+  // Auto-fill vehicle details from Supabase when vehicle number is entered
+  async function autofillOwnerDetails() {
+    const vehicleInput = document.getElementById("vehicle_no_full");
+    const ownerInput = document.getElementById("owner_name");
+    const flatInput = document.getElementById("flat_no");
+    const slotInput = document.getElementById("slot");
+    const typeInput = document.getElementById("vehicle_type");
+    const ownerContactAssign = document.getElementById("owner_contact_assign");
+
+    if (!vehicleInput) return;
+    const vehicleNo = vehicleInput.value.trim().toUpperCase();
+    if (!vehicleNo) return;
+
+    try {
+      const res = await fetch(`/get_vehicle_details/${vehicleNo}`);
+      const result = await res.json();
+      if (result.success && result.data) {
+        const d = result.data;
+        if (ownerInput) ownerInput.value = d.OwnerName || '';
+        if (flatInput) flatInput.value = d.FlatNo || '';
+        if (slotInput) slotInput.value = d.ParkingSlot || '';
+        if (typeInput) typeInput.value = d.VehicleType || '';
+        if (ownerContactAssign) ownerContactAssign.value = d.OwnerContact || '';
+      } else {
+        if (ownerInput) ownerInput.value = '';
+        if (flatInput) flatInput.value = '';
+        if (slotInput) slotInput.value = '';
+        if (typeInput) typeInput.value = '';
+        if (ownerContactAssign) ownerContactAssign.value = '';
+      }
+    } catch (err) {
+      console.error("Auto-fill error:", err);
+    }
+  }
+</script>
+
+<!-- 🌟 FLOATING REGISTER VEHICLE BUTTON -->
+<button class="btn btn-primary btn-lg shadow-lg"
+        style="position: fixed; bottom: 25px; right: 25px; z-index: 9999;
+               border-radius: 50px; padding: 16px 26px; font-weight: 700; font-size: 18px;"
+        onclick="openRegisterModal()">
+  ➕ Register Vehicle
+</button>
+
+<!-- 🌟 CENTER POPUP FOR DUPLICATE WARNING -->
+<div id="vehicleExistsPopup"
+     style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%);
+            background:#dc3545; padding:25px 40px; border-radius:12px;
+            color:white; font-size:20px; font-weight:700; display:none;
+            z-index:20000; text-align:center;">
+</div>
+
+<!-- 🌟 CENTER POPUP FOR SUCCESS REGISTRATION -->
+<div id="vehicleSuccessPopup"
+     style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%);
+            background:#28a745; padding:25px 40px; border-radius:12px;
+            color:white; font-size:20px; font-weight:700; display:none;
+            z-index:20000; text-align:center;">
+</div>
+
+
+<script>
+function showVehicleExistsPopup(msg) {
+  const box = document.getElementById('vehicleExistsPopup');
+  box.textContent = msg;
+  box.style.display = 'block';
+
+  setTimeout(() => box.style.display = 'none', 4000);
+}
+
+function showVehicleSuccessPopup(msg) {
+  const box = document.getElementById('vehicleSuccessPopup');
+  box.textContent = msg;
+  box.style.display = 'block';
+
+  setTimeout(() => box.style.display = 'none', 3500);
+}
+
+
+function openRegisterModal() {
+  const modal = new bootstrap.Modal(document.getElementById('registerVehicleModal'));
+  modal.show();
+}
+</script>
+{% if popup_message %}
+<script>
+  showVehicleExistsPopup("{{ popup_message }}");
+</script>
+{% endif %}
+
+{% if registration_success %}
+<script>
+    showVehicleSuccessPopup("{{ registration_success }}");
+</script>
+{% endif %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  // When user finishes typing vehicle number and leaves the field
+
+  const vehicleInput = document.getElementById("register_vehicle_no_full");
+  const registerBtn = document.getElementById("register_submit_btn");
+
+  if (vehicleInput) {
+    vehicleInput.addEventListener("blur", function () {
+      const number = this.value.trim().toUpperCase();
+
+      if (!number) {
+        // Empty input → enable button
+        registerBtn.disabled = false;
+        vehicleInput.classList.remove("is-invalid");
+        return;
+      }
+
+      fetch("/check_vehicle_exists", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `vehicle_no=${number}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.exists) {
+          // 🔴 Vehicle exists → disable button + popup + red border
+          registerBtn.disabled = true;
+          vehicleInput.classList.add("is-invalid");
+
+          showVehicleExistsPopup(
+            `Vehicle ${number} already exists and owner is ${data.owner}, ${data.flat}.`
+          );
+        } else {
+          // 🟢 Vehicle does not exist → enable button
+          registerBtn.disabled = false;
+          vehicleInput.classList.remove("is-invalid");
+        }
+      });
+    });
+  }
+
+  /* -----------------------------------------
+     AUTO-UPPERCASE + CLEAN SPACES (New Code)
+     ----------------------------------------- */
+
+  // Utility function to clean and uppercase text fields
+  function formatField(field) {
+    field.value = field.value
+      .toUpperCase()           // Convert to caps
+      .replace(/\s+/g, '')    // Convert multiple spaces → 1
+      .trim();                 // Trim start / end
+  }
+
+  function formatNameField(field) {
+    field.value = field.value
+      .trim()                           // remove leading + trailing spaces
+      .replace(/\s+/g, " ")             // reduce multiple spaces → single space
+      .toLowerCase()                    // convert all to lowercase
+      .replace(/\b\w/g, c => c.toUpperCase()); // capitalize first letter of each word
+  }
+
+  // Flat No field
+  const flatInput = document.getElementById("flat_no_register");
+  if (flatInput) {
+    flatInput.addEventListener("blur", function () {
+      formatField(this);
+    });
+  }
+
+  // Allotted Slot field
+  const slotInput = document.getElementById("slot_register");
+  if (slotInput) {
+    slotInput.addEventListener("blur", function () {
+      formatField(this);
+    });
+  }
+
+  const ownerInput = document.getElementById("owner_name_register");
+  if (ownerInput) {
+    ownerInput.addEventListener("blur", function () {
+      formatNameField(this);
+    });
+  }
+
+  // (Optional) Auto-uppercase plate number too
+  if (vehicleInput) {
+    vehicleInput.addEventListener("blur", function () {
+      formatField(this);
+    });
+  }
+
+
+  if (vehicleInput) {
+    vehicleInput.addEventListener("blur", function () {
+      const number = this.value.trim();
+
+      if (!number) return;
+
+      fetch("/check_vehicle_exists", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `vehicle_no=${number}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.exists) {
+          showVehicleExistsPopup(
+            `Vehicle ${number} already exists and owner is ${data.owner}, ${data.flat}.`
+          );
+        }
+      });
+    });
+  }
+});
+</script>
+<script>
+async function assignOrClamp(id, vehicle, parked_slot) {
+  if (!vehicle) return;
+  // optional confirm
+  if (!confirm(`Proceed to Assign/Clamp ${vehicle} ?`)) return;
+
+  try {
+    const res = await fetch('/assign_or_clamp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id,vehicle_no: vehicle, parked_slot: parked_slot || '' })
+    });
+    const data = await res.json();
+    if (data && data.success) {
+      // use smooth popup if available, else alert
+      if (typeof showSmoothPopup === 'function') {
+        showSmoothPopup(data.message || 'Operation completed', data.type || 'primary');
+      } else {
+        alert(data.message || 'Operation completed');
+      }
+      // refresh to reflect moved row into actioned/unregistered tabs
+      setTimeout(() => location.reload(), 1200);
+    } else {
+      const err = (data && data.error) ? data.error : 'Unknown error';
+      if (typeof showSmoothPopup === 'function') {
+        showSmoothPopup(err, 'secondary');
+      } else {
+        alert(err);
+      }
+    }
+  } catch (e) {
+    console.error("assignOrClamp error:", e);
+    if (typeof showSmoothPopup === 'function') showSmoothPopup('Network error', 'secondary'); else alert('Network error');
+  }
+}
+</script>
+
+
+<script>
+async function verifyAndNotify(id) {
+  try {
+    showSmoothPopup('Verifying record and preparing WhatsApp...', 'primary');
+
+    const resp = await fetch(`/verifyAndNotify/${id}`, { method: 'POST' });
+    const data = await resp.json();
+
+    if (!data || !data.success) {
+      alert("Verify failed: " + (data.error || 'Unknown error'));
+      setTimeout(() => location.reload(), 700);
+      return;
+    }
+
+    const ownerName = data.owner || "Owner";
+    showSmoothPopup(`Violation Verified — opening WhatsApp to notify ${ownerName}`, 'success');
+
+    // Deadline formatting
+    const now = new Date();
+    const deadline = new Date(now.getTime() + 86400000);
+    const dl = deadline.toLocaleString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+
+    // PREVIEW LINKS
+    const base = window.location.origin;
+    const previewUrl = `${base}/notify/preview/${data.id}`;
+<!--    const qrUrl = `${base}/notify/qr/${data.id}`;-->
+
+    // DIRECT URLs — no preview links anymore!
+    const qrUrl = data.qr_image;     // direct QR image
+    const imageUrls = data.images || [];
+
+    // Build WhatsApp message
+    let lines = [];
+
+    lines.push(" *TenX Habitat — Parking Violation Notice* ");
+    lines.push("");
+    lines.push(`*Vehicle :* ${data.vehicle_no}`);
+    lines.push(`*Owner :* ${data.owner}`);
+    lines.push(`*Flat :* ${data.flat}`);
+    lines.push("");
+    lines.push("*VIOLATION!!! Unauthorized Parking :*");
+    lines.push(`*Parked in ${data.parked_slot} instead of allotted ${data.allotted_slot}*`);
+    lines.push("");
+    lines.push(`*Fine Amount :* ₹${data.fine}`);
+    lines.push(`*Note - Pay before: ${dl} to avoid DELAY CHARGES of ₹100 & CLAMPING*`);
+    lines.push("");
+    lines.push("*Pay using QR (scan):*");
+    lines.push(qrUrl);       // DIRECT clickable
+    lines.push("");
+
+
+    if (imageUrls.length > 0) {
+      lines.push("*Violation Images Proof*:");
+      imageUrls.forEach(url => lines.push(url));  // DIRECT clickable URLs
+      lines.push("");
+    }
+
+    lines.push("Thank You,");
+    lines.push("TenX Parking Security");
+
+<!--    // Append direct image URLs (WhatsApp will try to render previews; keep this optional)-->
+<!--    // If you want the message to show image previews inline, append direct image URLs.-->
+<!--    if (Array.isArray(data.images) && data.images.length) {-->
+<!--      lines.push("");-->
+<!--      lines.push("Image(s):");-->
+<!--      for (const img of data.images) {-->
+<!--        lines.push(img);-->
+<!--      }-->
+<!--    }-->
+
+    const finalText = encodeURIComponent(lines.join("\n"));
+
+    let contact = (data.owner_contact || "").replace(/\D/g, "");
+    let waUrl = "";
+
+    if (contact.length >= 8) {
+      if (contact.length === 10) contact = "91" + contact;
+      waUrl = `https://wa.me/${contact}?text=${finalText}`;
+    } else {
+      waUrl = `https://wa.me/?text=${finalText}`;
+    }
+
+    window.open(waUrl, "_blank");
+    setTimeout(() => location.reload(), 1400);
+
+  } catch (err) {
+    console.error("verifyAndNotify error:", err);
+    alert("Network/server error.");
+    setTimeout(() => location.reload(), 700);
+  }
+}
+</script>
+
+
+</body>
+</html>

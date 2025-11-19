@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Unauthorized Parking — Report</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    body {
+      background: linear-gradient(180deg, #f6f8fb 0%, #eef3ff 100%);
+      font-family: Inter, system-ui, "Segoe UI", Roboto;
+    }
+    .hero {
+      background: linear-gradient(90deg, rgba(13,110,253,0.09), rgba(102,16,242,0.04));
+      border-radius: 14px;
+      padding: 28px;
+      box-shadow: 0 6px 20px rgba(14,30,80,0.06);
+    }
+    .drop-area {
+      border: 2px dashed rgba(13,110,253,0.18);
+      border-radius: 12px;
+      padding: 22px;
+      text-align: center;
+      background: rgba(255,255,255,0.6);
+    }
+    .thumb {
+      max-width: 180px;
+      max-height: 120px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin: 5px;
+      box-shadow: 0 6px 12px rgba(18,38,78,0.08);
+    }
+    .small-muted { font-size: .85rem; color: #6c757d; }
+    .download-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div class="container py-5">
+    <div class="hero mb-4">
+      <div class="row align-items-center">
+        <div class="col-lg-8">
+          <h1 class="h3 mb-1">TenX Habitat Parking Security Dashboard</h1>
+          <p class="small-muted mb-0">Capture unauthorized vehicle photos and notify society management.</p>
+        </div>
+        <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+          <a class="btn btn-outline-secondary me-2" href="{{ url_for('summary') }}"><i class="bi bi-graph-up"></i> My Summary</a>
+          <a class="btn btn-outline-primary" href="{{ url_for('admin_login') }}"><i class="bi bi-shield-lock"></i> Admin Dashboard</a><br><br>
+          <a class="btn btn-outline-success" href="{{ url_for('watchman_login') }}"><i class="bi bi-person-badge"></i> Watchman Panel</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row gy-4">
+      <div class="col-lg-7">
+        <div class="card p-4 shadow-sm">
+          <form id="reportForm" method="POST" action="{{ url_for('upload') }}" enctype="multipart/form-data">
+            <div class="mb-3">
+              <label class="form-label">Your Parking Slot <span class="text-danger">*</span></label>
+              <input id="parkingSlot" name="parking_slot" class="form-control form-control-lg" placeholder="Example: P5" required>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Upload 1–4 Images of Unauthorized Vehicle</label>
+              <div id="dropArea" class="drop-area mb-2">
+                <div id="dropText">
+                  <strong>Drag & drop up to 4 images</strong> or
+                  <button id="chooseBtn" type="button" class="btn btn-sm btn-link p-0">choose files</button>
+                  <div class="small-muted mt-1">JPEG/PNG only, max 4 images recommended.</div>
+                </div>
+                <input id="imageInput" name="image" type="file" accept="image/*" multiple style="display:none;">
+              </div>
+
+              <div id="previewBox" class="d-none">
+                <div class="d-flex flex-wrap gap-2" id="imagePreviewContainer"></div>
+                <button id="removeImage" type="button" class="btn btn-sm btn-outline-danger mt-2">Remove All</button>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Provide last 4 digits of Vehicle</label>
+              <input id="last4" name="last4" maxlength="10" class="form-control" placeholder="e.g. 1234">
+            </div>
+
+            <div class="d-grid">
+              <button id="submitBtn" type="submit" class="btn btn-primary btn-lg">
+                <span id="btnSpinner" class="d-none">
+                  <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing
+                </span>
+                <span id="btnText">Report Unauthorized Parking</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {% if result %}
+        <div id="resultCard" class="card border-primary shadow-sm mt-4 position-relative">
+          <button class="btn btn-outline-success btn-sm download-btn" onclick="downloadResultCard()">Download Report</button>
+          <div class="card-body">
+            <h5 class="text-primary">Violation Report</h5>
+            <p class="text-muted mb-2">
+              {{ result.vehicle_no }} — {{ result.owner }} (Flat {{ result.flat }})
+              <br><small class="text-muted">🕒 {{ result.timestamp }}</small>
+            </p>
+            <hr>
+            <div class="d-flex align-items-start gap-3">
+              {% if result.image_path %}
+                {% set paths = result.image_path.split(',') %}
+                <div class="d-flex flex-wrap">
+                  {% for path in paths %}
+                    <img src="{{ path | replace('\\','/') }}" alt="Vehicle" class="img-thumbnail me-2 mb-2" style="width:120px;">
+                  {% endfor %}
+                </div>
+              {% endif %}
+              <div>
+                {% if result.status == 'Pending' %}
+                  <p class="text-danger fw-semibold">
+                    ❌ VIOLATION DETECTED! {{ result.vehicle_no }} ({{ result.owner }}, Flat {{ result.flat }})
+                    parked in {{ result.parked_slot }} instead of {{ result.allotted_slot }}. Fine ₹{{ result.fine }}.
+                  </p>
+                {% elif result.status == 'OK' %}
+                  <p class="text-success fw-semibold">✅ No violation — Vehicle correctly parked.</p>
+                {% elif result.status == 'CLAMPED' %}
+                  <p class="text-danger fw-semibold">🚫 Vehicle {{ result.vehicle_no }} CLAMPED — Unknown Owner. Fine ₹1000.</p>
+                {% endif %}
+                <p><strong>Allotted Slot:</strong> {{ result.allotted_slot }}</p>
+                <p><strong>Suggested Fine:</strong> ₹{{ result.fine }}</p>
+                <p class="small text-muted">Watchman/Admin will verify before final action.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="col-lg-5">
+        <div class="card p-4 shadow-sm">
+          <h6>How it works</h6>
+          <ol class="small-muted">
+            <li>Upload 1–4 images of the illegally parked vehicle.</li>
+            <li>System extracts the plate number and checks the registry.</li>
+            <li>If mismatch → violation is logged and fine suggested.</li>
+          </ol>
+          <hr>
+          <h6>Fine Charges</h6>
+          <ol class="small-muted">
+            <li>Bike = ₹100</li>
+            <li>Car = ₹500</li>
+            <li>Repeated offender (>3 times) = ₹5000</li>
+            <li>Unknown / Not Registered Vehicle = ₹1000</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Elements
+    const imageInput = document.getElementById('imageInput');
+    const chooseBtn = document.getElementById('chooseBtn');
+    const dropArea = document.getElementById('dropArea');
+    const dropText = document.getElementById('dropText');
+    const previewBox = document.getElementById('previewBox');
+    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+    const removeImage = document.getElementById('removeImage');
+    const submitBtn = document.getElementById('submitBtn');
+    const btnSpinner = document.getElementById('btnSpinner');
+    const btnText = document.getElementById('btnText');
+
+    // Allow up to 4 files
+    chooseBtn.addEventListener('click', () => imageInput.click());
+    imageInput.addEventListener('change', handleFiles);
+    ['dragenter', 'dragover'].forEach(evt => {
+      dropArea.addEventListener(evt, e => {
+        e.preventDefault(); dropArea.classList.add('border-primary');
+      });
+    });
+    ['dragleave', 'drop'].forEach(evt => {
+      dropArea.addEventListener(evt, e => {
+        e.preventDefault(); dropArea.classList.remove('border-primary');
+      });
+    });
+    dropArea.addEventListener('drop', e => {
+      const files = Array.from(e.dataTransfer.files).slice(0, 4);
+      handleFiles({ target: { files } });
+    });
+
+    function handleFiles(e) {
+      const files = Array.from(e.target.files).slice(0, 4);
+      imagePreviewContainer.innerHTML = '';
+      if (!files.length) return;
+
+      previewBox.classList.remove('d-none');
+      dropText.style.display = 'none';
+
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = ev => {
+          const img = document.createElement('img');
+          img.src = ev.target.result;
+          img.className = 'thumb';
+          imagePreviewContainer.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    removeImage.addEventListener('click', () => {
+      imageInput.value = '';
+      imagePreviewContainer.innerHTML = '';
+      previewBox.classList.add('d-none');
+      dropText.style.display = '';
+    });
+
+    document.getElementById('reportForm').addEventListener('submit', () => {
+      btnSpinner.classList.remove('d-none');
+      btnText.textContent = 'Processing...';
+      submitBtn.disabled = true;
+    });
+
+    // Download Result Card (with CORS fix for Supabase images)
+    function downloadResultCard() {
+      const card = document.getElementById('resultCard');
+      html2canvas(card, {
+        scale: 2,
+        useCORS: true,       // ✅ allow cross-domain images
+        allowTaint: true,    // ✅ prevents canvas from tainting
+        logging: false
+      }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = 'Violation_Report.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      }).catch(err => {
+        console.error("⚠️ Error generating report:", err);
+        alert("Couldn't capture report. Please try again.");
+      });
+    }
+
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

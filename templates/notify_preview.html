@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Violation Preview</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background:#f8fafc; padding:18px; font-family:Inter,system-ui,Roboto,Segoe UI; }
+    .card { border-radius:12px; }
+    .thumb { max-width:120px; max-height:90px; object-fit:cover; border-radius:8px; margin:6px; cursor:pointer; }
+    .qr { max-width:240px; }
+  </style>
+</head>
+<body>
+<div class="container py-3">
+  <div class="card p-3 shadow-sm">
+    <h5 class="mb-1">🚨 Violation Preview</h5>
+    <div class="small text-muted mb-2">ID: {{ rec.id }} • {{ timestamp_fmt }}</div>
+
+    <div class="row">
+      <div class="col-12 col-md-6">
+        <p class="mb-1"><strong>Vehicle:</strong> {{ rec.detected_number }}</p>
+        <p class="mb-1"><strong>Owner:</strong> {{ rec.Owner or '—' }} <small class="text-muted">({{ rec.FlatNo or '—' }})</small></p>
+        <p class="mb-1"><strong>Parked slot:</strong> {{ rec.parked_slot or '—' }}</p>
+        <p class="mb-1"><strong>Fine:</strong> ₹{{ rec.fine or 0 }}</p>
+      </div>
+
+      <div class="col-12 col-md-6">
+        <div class="d-flex flex-wrap">
+          {% if images %}
+            {% for img in images %}
+              <img class="thumb" src="{{ img }}" onclick="openModal('{{ img }}')">
+            {% endfor %}
+          {% else %}
+            <div class="text-muted">No images available</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <hr>
+    <div class="d-flex justify-content-between">
+      <a class="btn btn-primary btn-sm" href="#" onclick="openAll(); return false;">Open all images</a>
+      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('notify_qr', id=rec.id) }}">View QR / Pay</a>
+    </div>
+  </div>
+</div>
+
+<!-- Large image modal -->
+<div class="modal fade" id="bigImgModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content p-2">
+      <img id="bigImg" src="" class="img-fluid rounded">
+    </div>
+  </div>
+</div>
+
+<script>
+function openModal(src) {
+  document.getElementById('bigImg').src = src;
+  new bootstrap.Modal(document.getElementById('bigImgModal')).show();
+}
+function openAll() {
+  // open first image in modal — user can open others via page links
+  const imgs = document.querySelectorAll('.thumb');
+  if (imgs.length) openModal(imgs[0].src);
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

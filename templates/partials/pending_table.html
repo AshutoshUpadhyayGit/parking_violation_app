@@ -1,0 +1,109 @@
+<div class="table-responsive mb-5">
+  <table class="table table-striped table-bordered align-middle">
+    <thead class="table-primary">
+      <tr>
+        <th>#</th>
+        <th>Timestamp</th>
+        <th>Vehicle No</th>
+        <th>Owner</th>
+        <th>Flat</th>
+        <th>Allotted Slot</th>
+        <th>Parked Slot</th>
+        <th>Fine</th>
+        <th>Status</th>
+        <th>Images</th>
+        <th>Watchman Notes</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in pending_records %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ r.timestamp or '—' }}</td>
+          <td>{{ r.detected_number or '—' }}</td>
+          <td>{{ r.Owner or '—' }}</td>
+          <td>{{ r.FlatNo or '—' }}</td>
+          <td>{{ r.allotted_slot or '—' }}</td>
+          <td>{{ r.parked_slot or '—' }}</td>
+          <td>₹{{ r.fine or 0 }}</td>
+          <td><span class="badge bg-warning text-dark">{{ r.Status or 'Pending' }}</span></td>
+          <td>
+            {% if r.image_paths %}
+              {% for img in r.image_paths %}
+                <img src="{{ img }}" class="thumb" onclick="showImage('{{ img }}')">
+              {% endfor %}
+            {% else %}—{% endif %}
+          </td>
+          <td>{{ r.watchman_observation or '' }}</td>
+          <td>
+<!--            &lt;!&ndash; ✅ VERIFY &ndash;&gt;-->
+<!--            <form method="POST" action="{{ url_for('verify', id=r.id) }}" class="d-inline"-->
+<!--                  onsubmit="return showSmoothPopup('✅ Record verified! Please check the Actioned tab.', 'success');">-->
+<!--              <button type="submit" class="btn btn-success btn-sm">Verify</button>-->
+<!--            </form>-->
+
+            <!-- Replace old Verify form with this button -->
+            <button type="button" class="btn btn-success btn-sm"
+                    onclick="verifyAndNotify({{ r.id }}, '{{ (r.Owner or '')|escape }}', '{{ (r.detected_number or '')|escape }}', {{ r.fine or 0 }});">
+              Verify & Notify
+            </button>
+
+
+            <!-- ✅ DISMISS -->
+            <form method="POST" action="{{ url_for('dismiss', id=r.id) }}" class="d-inline"
+                  onsubmit="return showSmoothPopup('ℹ️ Record dismissed! Please check the Actioned tab.', 'secondary');">
+              <button type="submit" class="btn btn-outline-secondary btn-sm">Dismiss</button>
+            </form>
+
+            <!-- ✅ ASSIGN / CLAMP -->
+            <button class="btn btn-outline-primary btn-sm mt-1"
+                    type="button"
+                    onclick="assignOrClamp('{{ r.id }}','{{ r.detected_number }}','{{ r.parked_slot }}');">
+              Assign / Clamp
+            </button>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if not pending_records %}
+  <p class="text-muted text-center">No pending violations 🎉</p>
+{% endif %}
+
+<!-- ✅ Smooth Fade-in/Fade-out Popup -->
+<div id="smoothPopup"
+     style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%);
+            background:rgba(0,0,0,0.85); color:#fff; padding:16px 30px; border-radius:10px;
+            font-weight:600; font-size:16px; opacity:0; transition:opacity 0.5s ease;
+            z-index:2000; text-align:center; pointer-events:none;">
+</div>
+
+<!-- ✅ Script -->
+<script>
+function showSmoothPopup(message, type) {
+  const popup = document.getElementById('smoothPopup');
+  popup.textContent = message;
+
+  // Set background color by type
+  let bg = 'rgba(0,0,0,0.85)';
+  if (type === 'success') bg = '#28a745';
+  else if (type === 'secondary') bg = '#6c757d';
+  else if (type === 'primary') bg = '#0d6efd';
+  popup.style.background = bg;
+  popup.style.display = 'block';
+
+  // Fade in
+  setTimeout(() => popup.style.opacity = '1', 10);
+
+  // Fade out after 3 seconds
+  setTimeout(() => {
+    popup.style.opacity = '0';
+    setTimeout(() => popup.style.display = 'none', 500);
+  }, 10000);
+
+  return true; // Proceed with form submit or modal open
+}
+</script>

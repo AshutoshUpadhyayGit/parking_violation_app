@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pay Fine — QR</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background:#fff; padding:18px; font-family:Inter,system-ui,Roboto,Segoe UI; }
+    .card { border-radius:12px; }
+    .qr-img { max-width:320px; }
+  </style>
+</head>
+<body>
+  <div class="container py-4">
+    <div class="card p-4 shadow-sm text-center">
+      <h5 class="mb-2">💳 Pay Fine — QR</h5>
+      {% if rec %}
+        <p class="small text-muted mb-2">Violation ID: {{ rec.id }} • Vehicle: {{ rec.detected_number }}</p>
+        <p class="mb-2"><strong>Amount:</strong> ₹{{ rec.fine or 0 }}</p>
+      {% endif %}
+      <div class="mb-3">
+        <img src="{{ qr_url }}" alt="QR" class="qr-img img-fluid rounded">
+      </div>
+      <p class="small text-muted mb-0">Scan with your UPI app or save image and pay using the UPI ID.</p>
+    </div>
+  </div>
+</body>
+</html>

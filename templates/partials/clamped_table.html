@@ -1,0 +1,61 @@
+<!-- templates/partials/clamped_table.html -->
+<div class="table-responsive">
+  <table class="table table-bordered align-middle">
+    <thead class="table-danger">
+      <tr>
+        <th>#</th>
+        <th>Timestamp</th>
+        <th>Vehicle No</th>
+        <th>Fine</th>
+        <th>Status</th>
+        <th>Images</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in clamped_records %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ r.timestamp or '—' }}</td>
+          <td>{{ r.detected_number or '—' }}</td>
+          <td>₹{{ r.fine or 1000 }}</td> <!-- Option A: always show ₹1000 if missing -->
+          <td><span class="badge bg-dark">UNKNOWN</span></td>
+          <td>
+            {% if r.image_path %}
+              {% for img in r.image_path.split(',') %}
+                {% set img_trimmed = img.strip() %}
+                {% if img_trimmed.startswith('http') %}
+                  <img src="{{ img_trimmed }}" class="thumb" onclick="showImage('{{ img_trimmed }}')">
+                {% else %}
+                  {% set clean_path = img_trimmed.replace('\\', '/').replace('static/', '') %}
+                  <img src="{{ url_for('static', filename=clean_path) }}" class="thumb"
+                       onclick="showImage('{{ url_for('static', filename=clean_path) }}')">
+                {% endif %}
+              {% endfor %}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>
+            <!-- Assign Owner: indicate source 'unknown' so modal hides checkbox -->
+            <button class="btn btn-primary btn-sm"
+                    onclick="openAssignModal('{{ r.detected_number }}', '{{ r.parked_slot }}', 'unknown');">
+              Assign Owner
+            </button>
+
+
+            <!-- Dismiss: move to Actioned (status = Dismissed) -->
+            <form method="POST" action="{{ url_for('dismiss_unknown', id=r.id) }}" class="d-inline"
+                  onsubmit="return showSmoothPopup('ℹ️ Record dismissed! Please check the Actioned tab.', 'secondary');">
+              <button type="submit" class="btn btn-outline-secondary btn-sm mt-1">Dismiss</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if not clamped_records %}
+  <p class="text-muted text-center">No unknown/unregistered vehicles 🎉</p>
+{% endif %}

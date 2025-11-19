@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Watchman Dashboard — TenX Habitat</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f5f7fa; }
+    .blink-red {
+      animation: blink 1s infinite;
+      background-color: #ffcccc !important;
+    }
+    @keyframes blink {
+      0% { background-color: #ffcccc; }
+      50% { background-color: #ff6666; }
+      100% { background-color: #ffcccc; }
+    }
+    .small-muted { font-size: 12px; color: #6c757d; }
+    .action-btns > button { margin-right: 6px; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+<div class="alert alert-primary text-center fw-semibold shadow-sm mt-3" role="alert">
+  <h4 class="fw-bold text-primary">🛡️ Watchman Dashboard</h4>
+</div>
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold text-primary">👋 Welcome, {{ watchman }}</h4>
+    <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">Logout</a>
+  </div>
+
+  <!-- Today's Violations -->
+  <h5 class="mb-3 text-dark">🚨 All Pending Violations</h5>
+  <div class="table-responsive">
+    <table class="table table-bordered align-middle">
+      <thead class="table-warning">
+        <tr>
+          <th>#</th>
+          <th>Time</th>
+          <th>Vehicle</th>
+          <th>Slot</th>
+          <th>Status</th>
+          <th>Watchman Note</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in today_records %}
+        <tr class="{% if r.is_overdue %}blink-red{% endif %}">
+          <td>{{ loop.index }}</td>
+          <td>{{ r.timestamp_fmt }}</td>
+          <td>
+            {{ r.detected_number }}<br><br>
+            {% if r.image_path %}
+                {% set imgs = r.image_path.split(',') %}
+                <div class="d-flex flex-wrap mt-1">
+                    {% for img in imgs %}
+                        <img src="{{ img | replace('\\','/') }}"
+                             onclick='showImages({{ imgs | tojson | safe }})'
+                             style="width:70px; height:50px; object-fit:cover;
+                                    border-radius:6px; cursor:pointer; margin-right:4px;
+                                    box-shadow:0 2px 6px rgba(0,0,0,0.2);">
+                    {% endfor %}
+                </div>
+            {% endif %}
+          </td>
+          <td>{{ r.parked_slot }}</td>
+          <td>{{ r.Status }}</td>
+
+          <!-- optional: show last watchman observation if backend provides 'watchman_observation' -->
+          <td class="small-muted">
+            {{ r.WatchmanNote or '—' }}
+          </td>
+
+          <td class="action-btns">
+            {# If this row is UNKNOWN, watchman should NOT take action (per requirement) #}
+            {% if r.Status and r.Status | upper == 'UNKNOWN' %}
+              <span class="small-muted">Unknown / Unregistered — no watchman action</span>
+            {% else %}
+              <!-- Buttons call JS function observeWatchman(violation_id, action) -->
+              <button class="btn btn-success btn-sm"
+                      onclick="observeWatchman({{ r.id if r.id is defined else 'null' }}, 'Verify')">
+                Verify
+              </button>
+
+              <button class="btn btn-outline-secondary btn-sm"
+                      onclick="observeWatchman({{ r.id if r.id is defined else 'null' }}, 'Dismiss')">
+                Dismiss
+              </button>
+
+              <button class="btn btn-danger btn-sm"
+                      onclick="observeWatchman({{ r.id if r.id is defined else 'null' }}, 'Clamp')">
+                Clamp
+              </button>
+
+              <button class="btn btn-dark btn-sm"
+                      onclick="observeWatchman({{ r.id if r.id is defined else 'null' }}, 'Unknown')">
+                Unknown
+              </button>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted">No pending violations 🎉</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h5 class="mt-5 text-secondary">📜 All Watchman Observations</h5>
+
+  <!-- Filter Dropdown -->
+  <form method="GET" action="">
+    <div class="row mb-3">
+      <div class="col-6">
+        <select name="filter_watchman" class="form-select" onchange="this.form.submit()">
+          <option value="ALL" {% if filter_watchman == "ALL" %}selected{% endif %}>All Watchmen</option>
+
+          {% for name in all_watchmen %}
+          <option value="{{ name }}" {% if filter_watchman == name %}selected{% endif %}>
+            {{ name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </form>
+
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>Watchman</th>
+          <th>Watchman Action</th>
+          <th>Vehicle</th>
+          <th>Parked At Slot</th>
+          <th>Image</th>
+          <th>Admin Action</th>
+          <th>Fine</th>
+          <th>Admin Action Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in recent_records %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ r.watchman_name }}</td>
+          <td>{{ r.action }}</td>
+          <td>{{ r.detected_number }}</td>
+          <td>{{ r.parked_slot }}</td>
+          <td>
+              {% if r.image_path %}
+                  {% set imgs = r.image_path.split(',') %}
+                  <button class="btn btn-sm btn-outline-primary"
+                          onclick='showImages({{ imgs | tojson | safe }})'>
+                      View Images ({{ imgs|length }})
+                  </button>
+              {% else %}
+                  —
+              {% endif %}
+          </td>
+          <td>{{ r.Status }}</td>
+          <td>{{ r.fine or 0 }}</td>
+          <td>{{ r.timestamp }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted">No observations recorded.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+  </div>
+
+  <!-- Pagination -->
+  <nav>
+    <ul class="pagination">
+      {% for p in range(1, total_pages + 1) %}
+        <li class="page-item {% if current_page == p %}active{% endif %}">
+          <a class="page-link"
+             href="?page={{ p }}&filter_watchman={{ filter_watchman }}">{{ p }}</a>
+        </li>
+      {% endfor %}
+    </ul>
+  </nav>
+
+</div>
+
+<script>
+  function showSmoothPopup(message, type) {
+    alert(message);   // simple, watchman UI should be quick
+  }
+
+  async function observeWatchman(violation_id, action) {
+    try {
+      const res = await fetch('/watchman_observe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ violation_id: violation_id, action: action, notes: "" })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        showSmoothPopup(data.message, 'success');
+        setTimeout(() => location.reload(), 700);
+      } else {
+        showSmoothPopup(data.error || 'Error', 'secondary');
+      }
+
+    } catch (e) {
+      console.error(e);
+      showSmoothPopup('Network error', 'secondary');
+    }
+  }
+
+  setTimeout(() => location.reload(), 30000);
+</script>
+
+<!-- Multi Image Viewer Modal -->
+<style>
+  #imgModal {
+      display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,0.85);
+      justify-content:center; align-items:center;
+      z-index:9999; flex-direction:column;
+  }
+  #modalImg {
+      max-width:90%; max-height:80%; border-radius:8px;
+  }
+  .nav-btn {
+      position:absolute; top:50%; transform:translateY(-50%);
+      background:rgba(255,255,255,0.2); border:none;
+      padding:10px 14px; border-radius:50%; cursor:pointer;
+      color:white; font-size:22px; font-weight:bold;
+  }
+  #prevBtn { left:20px; }
+  #nextBtn { right:20px; }
+</style>
+
+<div id="imgModal">
+    <button id="prevBtn" class="nav-btn">&#10094;</button>
+    <img id="modalImg">
+    <button id="nextBtn" class="nav-btn">&#10095;</button>
+</div>
+
+<script>
+  let imgList = [];
+  let imgIndex = 0;
+
+  function showImages(imgArray) {
+      imgList = imgArray;
+      imgIndex = 0;
+
+      updateModalImage();
+
+      document.getElementById("imgModal").style.display = "flex";
+  }
+
+  function updateModalImage() {
+      document.getElementById("modalImg").src = imgList[imgIndex];
+  }
+
+  // Next / Prev buttons
+  document.getElementById("nextBtn").onclick = () => {
+      imgIndex = (imgIndex + 1) % imgList.length;
+      updateModalImage();
+  };
+  document.getElementById("prevBtn").onclick = () => {
+      imgIndex = (imgIndex - 1 + imgList.length) % imgList.length;
+      updateModalImage();
+  };
+
+  // Close on background click
+  document.getElementById("imgModal").addEventListener("click", function(e) {
+      if (e.target === this) this.style.display = "none";
+  });
+
+  // Mobile swipe support
+  let startX = 0;
+  document.getElementById("imgModal").addEventListener("touchstart", (e) => {
+      startX = e.touches[0].clientX;
+  });
+  document.getElementById("imgModal").addEventListener("touchend", (e) => {
+      let endX = e.changedTouches[0].clientX;
+      if (endX - startX > 50) {  // Swipe Right
+          imgIndex = (imgIndex - 1 + imgList.length) % imgList.length;
+          updateModalImage();
+      } else if (startX - endX > 50) { // Swipe Left
+          imgIndex = (imgIndex + 1) % imgList.length;
+          updateModalImage();
+      }
+  });
+</script>
+
+</body>
+</html>
