@@ -850,7 +850,7 @@ def assign_or_clamp():
     """
     Called by admin UI when user clicks Assign / Clamp on the Pending list.
     - If vehicle is registered (exists in parking_data) -> immediately CLAMP (Actioned tab),
-      apply fine = 5000 if Verified+CLAMPED count > 10 else 1000.
+      apply fine = 5000 if Verified+CLAMPED count > 3 else 1000.
     - If vehicle is not registered -> mark as UNKNOWN (Unregistered tab) with fine 1000.
     """
     try:
@@ -940,7 +940,9 @@ def assign_or_clamp():
                                 "allotted_slot" = :slot,
                                 "fine" = :fine,
                                 "Status" = 'CLAMPED',
-                                "detected_number" = :new_num
+                                "detected_number" = :new_num,
+                                "VerifiedBy" = :admin,
+                                "VerifiedAt" = NOW()
                             WHERE RIGHT("detected_number", 4) = :last4
                               AND DATE_TRUNC('minute',"timestamp")
                                   = DATE_TRUNC('minute', to_timestamp(:ts,'YYYY-MM-DD HH24:MI:SS'));
@@ -964,7 +966,9 @@ def assign_or_clamp():
                                 "allotted_slot" = :slot,
                                 "fine" = :fine,
                                 "Status" = 'CLAMPED',
-                                "detected_number" = :new_num
+                                "detected_number" = :new_num,
+                                "VerifiedBy" = :admin,
+                                "VerifiedAt" = NOW()
                             WHERE ctid IN (
                                 SELECT ctid FROM violations
                                 WHERE RIGHT("detected_number", 4) = :last4
@@ -1008,7 +1012,14 @@ def assign_or_clamp():
                 "success": True,
                 "registered": True,
                 "type": "success",
-                "message": f"Clamping of Vehicle {vehicle} of {owner} is successful."
+                "message": f"Clamping of Vehicle {vehicle} of {owner} is successful.",
+                "vehicle_no": vehicle,
+                "owner": owner,
+                "owner_contact": contact,
+                "flat": flat,
+                "parked_slot": parked_slot,
+                "allotted_slot": default_slot,
+                "fine": fine
             })
 
         # -------------------------------------------------------------
@@ -1027,7 +1038,9 @@ def assign_or_clamp():
                             "FlatNo" = 'UNKNOWN',
                             "allotted_slot" = :slot,
                             "fine" = :fine,
-                            "Status" = 'UNKNOWN'
+                            "Status" = 'UNKNOWN',
+                            "VerifiedBy" = :admin,
+                            "VerifiedAt" = NOW()
                         WHERE RIGHT("detected_number", 4) = :last4
                           AND DATE_TRUNC('minute',"timestamp")
                               = DATE_TRUNC('minute', to_timestamp(:ts,'YYYY-MM-DD HH24:MI:SS'));
@@ -1041,7 +1054,9 @@ def assign_or_clamp():
                             "FlatNo" = 'UNKNOWN',
                             "allotted_slot" = :slot,
                             "fine" = :fine,
-                            "Status" = 'UNKNOWN'
+                            "Status" = 'UNKNOWN',
+                            "VerifiedBy" = :admin,
+                            "VerifiedAt" = NOW()
                         WHERE ctid IN (
                               SELECT ctid FROM violations
                               WHERE RIGHT("detected_number", 4) = :last4
@@ -1825,7 +1840,6 @@ def watchman_observe():
 
 # ---------------------- MAIN ---------------------- #
 if __name__ == '__main__':
-    
     app.run(debug=True)
 
 

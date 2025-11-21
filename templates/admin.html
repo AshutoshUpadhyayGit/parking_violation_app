@@ -528,39 +528,106 @@ document.addEventListener("DOMContentLoaded", function () {
 <script>
 async function assignOrClamp(id, vehicle, parked_slot) {
   if (!vehicle) return;
-  // optional confirm
-  if (!confirm(`Proceed to Assign/Clamp ${vehicle} ?`)) return;
+  if (!confirm(`Proceed to Assign/Clamp ${vehicle}?`)) return;
 
   try {
     const res = await fetch('/assign_or_clamp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: id,vehicle_no: vehicle, parked_slot: parked_slot || '' })
+      body: JSON.stringify({ id: id, vehicle_no: vehicle, parked_slot: parked_slot || '' })
     });
+
     const data = await res.json();
-    if (data && data.success) {
-      // use smooth popup if available, else alert
-      if (typeof showSmoothPopup === 'function') {
-        showSmoothPopup(data.message || 'Operation completed', data.type || 'primary');
-      } else {
-        alert(data.message || 'Operation completed');
-      }
-      // refresh to reflect moved row into actioned/unregistered tabs
-      setTimeout(() => location.reload(), 1200);
-    } else {
-      const err = (data && data.error) ? data.error : 'Unknown error';
-      if (typeof showSmoothPopup === 'function') {
-        showSmoothPopup(err, 'secondary');
-      } else {
-        alert(err);
-      }
+
+    if (!data || !data.success) {
+      const err = data?.error || 'Unknown error';
+      showSmoothPopup ? showSmoothPopup(err, 'secondary') : alert(err);
+      return;
     }
+
+    // Show success popup
+    if (typeof showSmoothPopup === "function") {
+      showSmoothPopup(data.message || "Operation done", data.type || "primary");
+    } else {
+      alert(data.message || "Operation done");
+    }
+
+    // -------------------------------------------
+    // ONLY SEND WHATSAPP IF VEHICLE IS REGISTERED
+    // -------------------------------------------
+    if (data.registered) {
+      // -------- Build WhatsApp Message ---------
+
+      const ownerName = data.owner || "Owner";
+      let contact = (data.owner_contact || "").replace(/\D/g, "");
+      if (contact.length === 10) contact = "91" + contact;
+
+      // Deadline: next day
+      const now = new Date();
+      const deadline = new Date(now.getTime() + 86400000);
+      const dl = deadline.toLocaleString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+
+      // QR + images
+      const qrUrl = data.qr_image || "";
+      const imageUrls = Array.isArray(data.images) ? data.images : [];
+
+      let lines = [];
+      lines.push(" *TenX Habitat — Parking Violation* ");
+      lines.push("");
+      lines.push(`*Vehicle :* ${data.vehicle_no}`);
+      lines.push(`*Owner :* ${data.owner}`);
+      lines.push(`*Flat :* ${data.flat}`);
+      lines.push("");
+      lines.push("*VEHICLE CLAMPED* — Unauthorized Parking");
+      lines.push(`*Parked in:* ${data.parked_slot}`);
+      lines.push(`*Allotted:* ${data.allotted_slot}`);
+      lines.push("");
+      lines.push(`*Fine:* ₹${data.fine}`);
+      lines.push(`*Pay before:* ${dl}`);
+      lines.push("");
+
+      if (qrUrl) {
+        lines.push("*Pay using QR:*");
+        lines.push(qrUrl);
+        lines.push("");
+      }
+
+      if (imageUrls.length > 0) {
+        lines.push("*Violation Images:*");
+        imageUrls.forEach(url => lines.push(url));
+        lines.push("");
+      }
+
+      lines.push("Thank You,");
+      lines.push("TenX Parking Security");
+
+      const finalText = encodeURIComponent(lines.join("\n"));
+
+      let waUrl = contact.length >= 10
+        ? `https://wa.me/${contact}?text=${finalText}`
+        : `https://wa.me/?text=${finalText}`;
+
+      // Open WhatsApp
+      window.open(waUrl, "_blank");
+    }
+
+    // Reload page after action
+    setTimeout(() => location.reload(), 1500);
+
   } catch (e) {
     console.error("assignOrClamp error:", e);
-    if (typeof showSmoothPopup === 'function') showSmoothPopup('Network error', 'secondary'); else alert('Network error');
+    if (typeof showSmoothPopup === "function") {
+      showSmoothPopup("Network error", "secondary");
+    } else {
+      alert("Network error");
+    }
   }
 }
 </script>
+
 
 
 <script>
