@@ -1,9 +1,5 @@
-import psycopg2, os
+import psycopg2
+POSTGRES_CONN = "postgresql://postgres.rkjebswwcflbxwotoocu:parking_system@aws-1-ap-south-1.pooler.supabase.com:6543/postgres"
 
-url = os.getenv("SUPABASE_DB_URL")
-
-try:
-    conn = psycopg2.connect(url)
-    print("CONNECTED")
-except Exception as e:
-    print("FAILED:", e)
+conn = psycopg2.connect(POSTGRES_CONN)
+print("Connected to Supabase!")
