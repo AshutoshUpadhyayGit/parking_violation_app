@@ -17,7 +17,10 @@ SUPABASE_BUCKET = "vehicle-images"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Connection string for Postgres (through Supabase)
-POSTGRES_CONN = "postgresql://postgres:parking_system@db.rkjebswwcflbxwotoocu.supabase.co:5432/postgres"
+# POSTGRES_CONN = "postgresql://postgres:parking_system@db.rkjebswwcflbxwotoocu.supabase.co:5432/postgres"
+
+POSTGRES_CONN = "postgresql://postgres.rkjebswwcflbxwotoocu:parking_system@aws-1-ap-south-1.pooler.supabase.com:6543/postgres"
+
 
 # =========================================
 # 🧠 DATABASE UTILITIES
