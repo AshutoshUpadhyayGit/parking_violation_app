@@ -951,7 +951,7 @@ def assign_or_clamp():
                             "owner": owner,
                             "contact": contact,
                             "flat": flat,
-                            "slot": parked_slot or default_slot,
+                            "slot": default_slot,
                             "fine": fine,
                             "new_num": vehicle,
                             "last4": last4,
@@ -981,7 +981,7 @@ def assign_or_clamp():
                             "owner": owner,
                             "contact": contact,
                             "flat": flat,
-                            "slot": parked_slot or default_slot,
+                            "slot": default_slot,
                             "fine": fine,
                             "new_num": vehicle,
                             "last4": last4,
@@ -1029,6 +1029,7 @@ def assign_or_clamp():
         # 2️⃣ UNREGISTERED VEHICLE → UNKNOWN → UNKNOWN TAB
         # -------------------------------------------------------------
         fine = 1000
+        default_slot = parking_rec.get("ParkingSlot") or ""
 
         # Update DB row → UNKNOWN (FIXED)
         try:
@@ -1047,7 +1048,7 @@ def assign_or_clamp():
                         WHERE RIGHT("detected_number", 4) = :last4
                           AND DATE_TRUNC('minute',"timestamp")
                               = DATE_TRUNC('minute', to_timestamp(:ts,'YYYY-MM-DD HH24:MI:SS'));
-                    """), {"slot": parked_slot or 'N/A', "fine": fine, "last4": last4, "ts": ts_str,"admin": admin})
+                    """), {"slot": default_slot or 'N/A', "fine": fine, "last4": last4, "ts": ts_str,"admin": admin})
             else:
                 with engine.begin() as conn:
                     conn.execute(text("""
@@ -1066,7 +1067,7 @@ def assign_or_clamp():
                                 AND COALESCE("Status",'') NOT IN ('Verified','Dismissed','CLAMPED','UNKNOWN')
                               ORDER BY "timestamp" DESC LIMIT 1
                         );
-                    """), {"slot": parked_slot or 'N/A', "fine": fine, "last4": last4,"admin": admin})
+                    """), {"slot": default_slot or 'N/A', "fine": fine, "last4": last4,"admin": admin})
         except Exception as e:
             print("⚠️ Unregistered DB update failed:", e)
 
