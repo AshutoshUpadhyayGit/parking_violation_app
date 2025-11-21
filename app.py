@@ -857,6 +857,7 @@ def assign_or_clamp():
         data = request.get_json() or {}
         vehicle = str(data.get("vehicle_no", "")).strip().upper()
         parked_slot = str(data.get("parked_slot", "")).strip().upper()
+        admin = session.get("admin_user", "Admin")
 
         if not vehicle:
             return jsonify({"success": False, "error": "No vehicle provided."})
