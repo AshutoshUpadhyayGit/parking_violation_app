@@ -219,6 +219,7 @@ def logout():
 
 @app.route('/upload', methods=['POST'])
 def upload():
+    from zoneinfo import ZoneInfo
     try:
         parking_slot = request.form.get('parking_slot', '').strip().upper()
         entered_digits = request.form.get('last4', '').strip()
@@ -305,7 +306,8 @@ def upload():
                 'flat': 'UNKNOWN',
                 'allotted_slot': 'N/A',
                 'parked_slot': parking_slot,
-                'timestamp': record['timestamp']
+                # 'timestamp': record['timestamp']
+                'timestamp' : datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d %H:%M:%S")
             }
             return render_template('index.html', message="🚨 Vehicle Not Registered — Logged for Admin Verification.", result=result)
 
@@ -381,10 +383,11 @@ def upload():
             'flat': flat,
             'allotted_slot': allotted_slot,
             'parked_slot': parking_slot,
-            'timestamp': record['timestamp'],
+            # 'timestamp': record['timestamp'],
+            'timestamp': datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d %H:%M:%S"),
             'OwnerContact': OwnerContact
         }
-        print(">>> Upload result sent:", result)
+        print(">>> Upload result sent (db time is utc but display is IST):", record)
 
         return render_template('index.html', message=message, result=result)
 
@@ -540,7 +543,7 @@ def verify(id):
                 UPDATE violations
                 SET "Status" = 'Verified',
                     "VerifiedBy" = :admin,
-                    "VerifiedAt" = NOW()
+                    "VerifiedAt" = (now() AT TIME ZONE 'Asia/Kolkata')
                 WHERE id = :id;
             """), {"admin": admin, "id": id})
 
@@ -578,7 +581,7 @@ def dismiss(id):
                 UPDATE violations
                 SET "Status" = 'Dismissed',
                     "VerifiedBy" = :admin,
-                    "VerifiedAt" = NOW()
+                    "VerifiedAt" = (now() AT TIME ZONE 'Asia/Kolkata')
                 WHERE id = :id;
             """), {"admin": admin, "id": id})
 
@@ -665,7 +668,7 @@ def verifyAndNotify(id):
                     UPDATE violations
                     SET "Status" = 'Verified',
                         "VerifiedBy" = :admin,
-                        "VerifiedAt" = NOW()
+                        "VerifiedAt" = (now() AT TIME ZONE 'Asia/Kolkata')
                     WHERE id = :id;
                 """), {"admin": admin, "id": id})
         except Exception as e:
@@ -943,7 +946,7 @@ def assign_or_clamp():
                                 "Status" = 'CLAMPED',
                                 "detected_number" = :new_num,
                                 "VerifiedBy" = :admin,
-                                "VerifiedAt" = NOW()
+                                "VerifiedAt" = (now() AT TIME ZONE 'Asia/Kolkata')
                             WHERE RIGHT("detected_number", 4) = :last4
                               AND DATE_TRUNC('minute',"timestamp")
                                   = DATE_TRUNC('minute', to_timestamp(:ts,'YYYY-MM-DD HH24:MI:SS'));
@@ -970,7 +973,7 @@ def assign_or_clamp():
                                 "Status" = 'CLAMPED',
                                 "detected_number" = :new_num,
                                 "VerifiedBy" = :admin,
-                                "VerifiedAt" = NOW()
+                                "VerifiedAt" = (now() AT TIME ZONE 'Asia/Kolkata')
                             WHERE ctid IN (
                                 SELECT ctid FROM violations
                                 WHERE RIGHT("detected_number", 4) = :last4
@@ -1044,7 +1047,7 @@ def assign_or_clamp():
                             "fine" = :fine,
                             "Status" = 'UNKNOWN',
                             "VerifiedBy" = :admin,
-                            "VerifiedAt" = NOW()
+                            "VerifiedAt" = (now() AT TIME ZONE 'Asia/Kolkata')
                         WHERE RIGHT("detected_number", 4) = :last4
                           AND DATE_TRUNC('minute',"timestamp")
                               = DATE_TRUNC('minute', to_timestamp(:ts,'YYYY-MM-DD HH24:MI:SS'));
@@ -1060,7 +1063,7 @@ def assign_or_clamp():
                             "fine" = :fine,
                             "Status" = 'UNKNOWN',
                             "VerifiedBy" = :admin,
-                            "VerifiedAt" = NOW()
+                            "VerifiedAt" = (now() AT TIME ZONE 'Asia/Kolkata')
                         WHERE ctid IN (
                               SELECT ctid FROM violations
                               WHERE RIGHT("detected_number", 4) = :last4

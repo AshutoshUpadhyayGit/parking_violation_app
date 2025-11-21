@@ -64,8 +64,13 @@
           <form id="reportForm" method="POST" action="{{ url_for('upload') }}" enctype="multipart/form-data">
             <div class="mb-3">
               <label class="form-label">Your Parking Slot <span class="text-danger">*</span></label>
-              <input id="parkingSlot" name="parking_slot" class="form-control form-control-lg" placeholder="Example: P5" required>
+              <input id="parkingSlot" name="parking_slot" class="form-control form-control-lg" placeholder="Example: G99" required>
             </div>
+            <script>
+            document.getElementById("parkingSlot").addEventListener("input", function () {
+                this.value = this.value.toUpperCase().replace(/\s+/g, "");
+            });
+            </script>
 
             <div class="mb-3">
               <label class="form-label">Upload 1–4 Images of Unauthorized Vehicle</label>
