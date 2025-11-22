@@ -515,6 +515,8 @@ def admin_dashboard():
                 how='left'
             )
 
+            print("My Pending Record : \n", pending_df.to_dict(orient='records'))
+
             actioned_df = df[df['Status'].isin(['Verified', 'Dismissed','CLAMPED'])]
             clamped_df = df[df['Status'].eq('UNKNOWN')]
 
