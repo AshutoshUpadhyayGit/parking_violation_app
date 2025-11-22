@@ -473,6 +473,12 @@ def admin_dashboard():
 
             # Split by Status
             pending_df = df[~df['Status'].isin(['Verified', 'Dismissed', 'CLAMPED','UNKNOWN'])]
+            pending_df['timestamp_disp'] = (
+                pd.to_datetime(pending_df['timestamp'], errors='coerce')
+                    .dt.tz_localize('UTC')
+                    .dt.tz_convert('Asia/Kolkata')
+            )
+
             # ---------------------------
             # NEW: Attach Watchman Observations
             # ---------------------------
@@ -1426,6 +1432,12 @@ def admin_actioned():
                     df[c] = ""
 
             df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+            df['timestamp_disp'] = (
+                pd.to_datetime(df['timestamp'], errors='coerce')
+                    .dt.tz_localize('UTC')
+                    .dt.tz_convert('Asia/Kolkata')
+            )
+
             df = df[df['Status'].isin(['Verified', 'Dismissed','CLAMPED'])].copy()
 
         # ✅ Step 3: Clean image paths (works for both DB + Excel)
@@ -1584,7 +1596,14 @@ def watchman_dashboard():
 
         df["timestamp"] = df["timestamp"].dt.floor("min")
         # print('df["timestamp"] : \n', df["timestamp"], df["timestamp"].dtype)
-        df["timestamp_fmt"] = df["timestamp"].dt.strftime("%d-%b-%Y %H:%M")
+        # df["timestamp_fmt"] = df["timestamp"].dt.strftime("%d-%b-%Y %H:%M")
+
+        # NOTE : timestamp_fmt is just for display in frontend in IST
+        df["timestamp_fmt"] = (
+            df["timestamp"]
+                .dt.tz_convert("Asia/Kolkata")
+                .dt.strftime("%d-%b-%Y %H:%M")
+        )
 
         # ------------------------------
         # Today's date in IST
