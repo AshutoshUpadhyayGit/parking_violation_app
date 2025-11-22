@@ -20,7 +20,7 @@
       {% for r in pending_records %}
         <tr>
           <td>{{ loop.index }}</td>
-          <td>{{ r.timestamp or '—' }}</td>
+          <td>{{ r.timestamp_disp or '—' }}</td>
           <td>{{ r.detected_number or '—' }}</td>
           <td>{{ r.Owner or '—' }}</td>
           <td>{{ r.FlatNo or '—' }}</td>
