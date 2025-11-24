@@ -930,7 +930,8 @@ def assign_or_clamp():
             owner = parking_rec.get("OwnerName") or ""
             flat = parking_rec.get("FlatNo") or ""
             contact = parking_rec.get("OwnerContact") or ""
-            default_slot = parking_rec.get("ParkingSlot") or ""
+            # default_slot = parking_rec.get("ParkingSlot") or ""
+            default_slot = parking_rec.get("ParkingSlot") if parking_rec else ""
 
             # Update DB row → CLAMPED
             try:
@@ -1032,7 +1033,8 @@ def assign_or_clamp():
         # 2️⃣ UNREGISTERED VEHICLE → UNKNOWN → UNKNOWN TAB
         # -------------------------------------------------------------
         fine = 1000
-        default_slot = parking_rec.get("ParkingSlot") or ""
+        default_slot = parking_rec.get("ParkingSlot") if parking_rec else ""
+
 
         # Update DB row → UNKNOWN (FIXED)
         try:
