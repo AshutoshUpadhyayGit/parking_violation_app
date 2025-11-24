@@ -1,3 +1,4 @@
+<div class="d-none d-md-block">
 <table class="table table-striped align-middle">
   <thead class="table-light">
     <tr>
@@ -48,3 +49,67 @@
   {% endif %}
   </tbody>
 </table>
+</div>
+
+<!-- 📱 MOBILE VIEW — Card Layout for Actioned Records -->
+<div class="d-md-none">
+
+  {% if actioned_records %}
+    {% for r in actioned_records %}
+    <div class="card shadow-sm mb-3 p-3">
+
+      <!-- Vehicle + Timestamp -->
+      <div class="d-flex justify-content-between">
+        <h6 class="fw-bold mb-1">{{ r.detected_number }}</h6>
+        <small class="text-muted">{{ r.timestamp }}</small>
+      </div>
+
+      <!-- Owner + Flat -->
+      <div class="mt-2">
+        <div><strong>Owner:</strong> {{ r.Owner or '—' }}</div>
+        <div><strong>Flat:</strong> {{ r.FlatNo or '—' }}</div>
+      </div>
+
+      <!-- Slot -->
+      <div class="mt-2">
+        <strong>Slot:</strong> {{ r.parked_slot or '—' }}
+      </div>
+
+      <!-- Fine -->
+      <div class="mt-2">
+        <strong>Fine:</strong> ₹{{ r.fine or 0 }}
+      </div>
+
+      <!-- Status Badge -->
+      <div class="mt-2">
+        <strong>Status:</strong>
+        {% if r.Status == 'Verified' %}
+          <span class="badge bg-success">Verified</span>
+        {% elif r.Status == 'Dismissed' %}
+          <span class="badge bg-secondary">Dismissed</span>
+        {% else %}
+          <span class="badge bg-light text-dark">{{ r.Status }}</span>
+        {% endif %}
+      </div>
+
+      <!-- Images Scrollable -->
+      {% if r.image_paths and r.image_paths|length > 0 %}
+      <div class="mt-3 d-flex gap-2 overflow-auto">
+        {% for img in r.image_paths %}
+          <img src="{{ img }}"
+               onclick="showImage('{{ img }}')"
+               style="width:80px; height:80px; object-fit:cover; border-radius:8px;">
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="mt-2 text-muted">No images</div>
+      {% endif %}
+
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="text-muted text-center">No actioned records</p>
+  {% endif %}
+
+</div>
+<!-- END MOBILE VIEW -->

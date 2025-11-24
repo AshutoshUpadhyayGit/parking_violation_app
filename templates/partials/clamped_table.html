@@ -1,5 +1,5 @@
 <!-- templates/partials/clamped_table.html -->
-<div class="table-responsive">
+<div class="table-responsive d-none d-md-block">
   <table class="table table-bordered align-middle">
     <thead class="table-danger">
       <tr>
@@ -55,6 +55,80 @@
     </tbody>
   </table>
 </div>
+
+<!-- 📱 MOBILE CARD VIEW FOR CLAMPED VEHICLES -->
+<div class="d-md-none">
+
+  {% for r in clamped_records %}
+  <div class="card shadow-sm mb-3 p-3">
+
+    <!-- Vehicle No + Timestamp -->
+    <div class="d-flex justify-content-between">
+      <h6 class="fw-bold mb-1">{{ r.detected_number or '—' }}</h6>
+      <small class="text-muted">{{ r.timestamp or '—' }}</small>
+    </div>
+
+    <!-- Fine -->
+    <div class="mt-2">
+      <strong>Fine:</strong> ₹{{ r.fine or 1000 }}
+    </div>
+
+    <!-- Status -->
+    <div class="mt-2">
+      <strong>Status:</strong>
+      <span class="badge bg-dark">UNKNOWN</span>
+    </div>
+
+    <!-- Images (same logic as desktop) -->
+    {% if r.image_path %}
+    <div class="mt-3 d-flex gap-2 overflow-auto">
+
+      {% for img in r.image_path.split(',') %}
+        {% set img_trimmed = img.strip() %}
+
+        {% if img_trimmed.startswith('http') %}
+          <img src="{{ img_trimmed }}"
+               style="width:80px; height:80px; object-fit:cover; border-radius:8px;"
+               onclick="showImage('{{ img_trimmed }}')">
+        {% else %}
+          {% set clean = img_trimmed.replace('\\','/').replace('static/','') %}
+          <img src="{{ url_for('static', filename=clean) }}"
+               style="width:80px; height:80px; object-fit:cover; border-radius:8px;"
+               onclick="showImage('{{ url_for('static', filename=clean) }}')">
+        {% endif %}
+      {% endfor %}
+
+    </div>
+    {% else %}
+    <div class="mt-2 text-muted">—</div>
+    {% endif %}
+
+    <!-- ACTION BUTTONS -->
+    <div class="mt-3 d-grid gap-2">
+
+      <!-- ASSIGN OWNER -->
+      <button class="btn btn-primary"
+              onclick="openAssignModal('{{ r.detected_number }}', '{{ r.parked_slot }}', 'unknown');">
+        Assign Owner
+      </button>
+
+      <!-- DISMISS -->
+      <form method="POST"
+            action="{{ url_for('dismiss_unknown', id=r.id) }}"
+            onsubmit="return showSmoothPopup('ℹ️ Record dismissed! Please check the Actioned tab.', 'secondary');">
+        <button type="submit" class="btn btn-outline-secondary w-100">
+          Dismiss
+        </button>
+      </form>
+
+    </div>
+
+  </div>
+  {% endfor %}
+
+</div>
+<!-- END MOBILE VIEW -->
+
 
 {% if not clamped_records %}
   <p class="text-muted text-center">No unknown/unregistered vehicles 🎉</p>

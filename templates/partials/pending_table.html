@@ -69,6 +69,93 @@
   </table>
 </div>
 
+<!-- 📱 MOBILE VIEW — Card Layout -->
+<div class="d-md-none">
+
+  {% for r in pending_records %}
+  <div class="card shadow-sm mb-3 p-3">
+
+    <!-- Vehicle + Timestamp -->
+    <div class="d-flex justify-content-between">
+      <h6 class="fw-bold mb-1">{{ r.detected_number or '—' }}</h6>
+      <small class="text-muted">{{ r.timestamp or '—' }}</small>
+    </div>
+
+    <!-- Owner + Flat -->
+    <div class="mt-2">
+      <div><strong>Owner:</strong> {{ r.Owner or '—' }}</div>
+      <div><strong>Flat:</strong> {{ r.FlatNo or '—' }}</div>
+    </div>
+
+    <!-- Slots -->
+    <div class="mt-2">
+      <div><strong>Allotted:</strong> {{ r.allotted_slot or '—' }}</div>
+      <div><strong>Parked:</strong> {{ r.parked_slot or '—' }}</div>
+    </div>
+
+    <!-- Fine + Status -->
+    <div class="mt-2">
+      <div><strong>Fine:</strong> ₹{{ r.fine or 0 }}</div>
+      <div>
+        <strong>Status:</strong>
+        <span class="badge bg-warning text-dark">{{ r.Status or 'Pending' }}</span>
+      </div>
+    </div>
+
+    <!-- Watchman Notes -->
+    {% if r.watchman_observation %}
+    <div class="mt-2">
+      <strong>Watchman Notes:</strong>
+      <div class="text-muted">{{ r.watchman_observation }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Images -->
+    {% if r.image_paths %}
+    <div class="mt-3 d-flex gap-2 overflow-auto">
+      {% for img in r.image_paths %}
+      <img src="{{ img }}"
+           onclick="showImage('{{ img }}')"
+           style="width:80px; height:80px; object-fit:cover; border-radius:8px;">
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- ACTION BUTTONS (Full-width for mobile) -->
+    <div class="mt-3 d-grid gap-2">
+
+      <!-- Verify & Notify -->
+      <button type="button"
+              class="btn btn-success"
+              onclick="verifyAndNotify({{ r.id }}, '{{ (r.Owner or '')|escape }}', '{{ (r.detected_number or '')|escape }}', {{ r.fine or 0 }})">
+        Verify & Notify
+      </button>
+
+      <!-- Dismiss -->
+      <form method="POST"
+            action="{{ url_for('dismiss', id=r.id) }}"
+            onsubmit="return showSmoothPopup('ℹ️ Record dismissed! Please check the Actioned tab.', 'secondary');">
+        <button type="submit" class="btn btn-outline-secondary w-100">
+          Dismiss
+        </button>
+      </form>
+
+      <!-- Assign / Clamp -->
+      <button class="btn btn-outline-primary"
+              type="button"
+              onclick="assignOrClamp('{{ r.id }}','{{ r.detected_number }}','{{ r.parked_slot }}');">
+        Assign / Clamp
+      </button>
+
+    </div>
+
+  </div>
+  {% endfor %}
+
+</div>
+<!-- END MOBILE VIEW -->
+
+
 {% if not pending_records %}
   <p class="text-muted text-center">No pending violations 🎉</p>
 {% endif %}
