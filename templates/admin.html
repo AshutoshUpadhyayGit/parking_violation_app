@@ -556,6 +556,20 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
+  // ------------------------------------------------------
+  // APPLY SAME FORMATTING BEHAVIOR TO ASSIGN OWNER MODAL
+  // ------------------------------------------------------
+  const vehicleAssign = document.getElementById("vehicle_no_full");
+  const ownerAssign   = document.getElementById("owner_name");
+  const flatAssign    = document.getElementById("flat_no");
+  const slotAssign    = document.getElementById("slot");
+
+  if (vehicleAssign) vehicleAssign.addEventListener("blur", () => formatField(vehicleAssign));
+  if (flatAssign)    flatAssign.addEventListener("blur",    () => formatField(flatAssign));
+  if (slotAssign)    slotAssign.addEventListener("blur",    () => formatField(slotAssign));
+  if (ownerAssign)   ownerAssign.addEventListener("blur",   () => formatNameField(ownerAssign));
+
+
 
   if (vehicleInput) {
     vehicleInput.addEventListener("blur", function () {
