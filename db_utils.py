@@ -764,3 +764,16 @@ def fetch_all_watchman_actions():
         return pd.DataFrame()
 
 
+# helper: force timestamp column to IST and formatted string
+def force_df_timestamps_to_ist(df, col='timestamp', fmt='%d-%b-%Y %H:%M'):
+    import pandas as pd
+    if col not in df.columns:
+        return df
+    # Parse, interpret as UTC if naive/unknown, then convert to Asia/Kolkata
+    df[col] = pd.to_datetime(df[col], errors='coerce', utc=True)  # parse as UTC
+    df[col] = df[col].dt.tz_convert('Asia/Kolkata')
+    # optional: drop tz info for easier template use (still keep tz-aware object if you prefer)
+    df[col] = df[col].dt.tz_localize(None)
+    df[col] = df[col].dt.floor('min')
+    df[f'{col}_fmt'] = df[col].dt.strftime(fmt)
+    return df

@@ -99,7 +99,7 @@
           {% for r in today_records %}
           <tr class="{% if r.is_overdue %}blink-red{% endif %}">
             <td>{{ loop.index }}</td>
-            <td>{{ r.timestamp_fmt }}</td>
+            <td>{{ r.timestamp_fmt or r.timestamp }}</td>
             <td>
               {{ r.detected_number }}<br><br>
               {% if r.image_path %}
@@ -167,7 +167,7 @@
 
       <div class="d-flex justify-content-between">
         <h6 class="fw-bold text-primary mb-1">{{ r.detected_number }}</h6>
-        <small class="text-muted">{{ r.timestamp_fmt }}</small>
+        <small class="text-muted">{{ r.timestamp_fmt or r.timestamp }}</small>
       </div>
 
       <div class="mt-2"><strong>Slot:</strong> {{ r.parked_slot }}</div>
@@ -275,7 +275,7 @@
             </td>
             <td>{{ r.Status }}</td>
             <td>{{ r.fine or 0 }}</td>
-            <td>{{ r.timestamp }}</td>
+            <td>{{ r.timestamp_fmt or r.timestamp }}</td>
           </tr>
           {% else %}
           <tr><td colspan="8" class="text-center text-muted">No observations recorded.</td></tr>
@@ -293,7 +293,7 @@
     <div class="mobile-card">
 
       <div class="fw-bold">{{ r.detected_number }}</div>
-      <div class="text-muted small">{{ r.timestamp }}</div>
+      <div class="text-muted small">{{ r.timestamp_fmt or r.timestamp }}</div>
 
       <div class="mt-2">
         <strong>Watchman:</strong> {{ r.watchman_name }}

@@ -468,6 +468,8 @@ def admin_dashboard():
             df['image_path'] = df['image_path'].fillna("")
             df['image_paths'] = df['image_path'].apply(lambda x: [p.strip() for p in str(x).split(',') if p.strip()])
             df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+            # Convert timestamps to IST for display
+            df = force_df_timestamps_to_ist(df, col="timestamp", fmt="%d-%b-%Y %H:%M")
             df = df.sort_values(by='timestamp', ascending=False).reset_index(drop=True)
             # df['record_id'] = df.index
 
@@ -1586,7 +1588,9 @@ def watchman_dashboard():
 
         df["timestamp"] = df["timestamp"].dt.floor("min")
         # print('df["timestamp"] : \n', df["timestamp"], df["timestamp"].dtype)
-        df["timestamp_fmt"] = df["timestamp"].dt.strftime("%d-%b-%Y %H:%M")
+        # df["timestamp_fmt"] = df["timestamp"].dt.strftime("%d-%b-%Y %H:%M")
+        # Force all timestamps to IST
+        df = force_df_timestamps_to_ist(df, col="timestamp", fmt="%d-%b-%Y %H:%M")
 
         # ------------------------------
         # Today's date in IST

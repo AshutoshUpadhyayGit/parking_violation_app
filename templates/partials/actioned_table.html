@@ -18,7 +18,7 @@
     {% for r in actioned_records %}
       <tr>
         <td>{{ loop.index }}</td>
-        <td>{{ r.timestamp }}</td>
+        <td>{{ r.timestamp_fmt or r.timestamp }}</td>
         <td>{{ r.detected_number }}</td>
         <td>{{ r.Owner or '—' }}</td>
         <td>{{ r.FlatNo or '—' }}</td>
