@@ -61,7 +61,7 @@
       <!-- Vehicle + Timestamp -->
       <div class="d-flex justify-content-between">
         <h6 class="fw-bold mb-1">{{ r.detected_number }}</h6>
-        <small class="text-muted">{{ r.timestamp }}</small>
+        <small class="text-muted">{{ r.timestamp_fmt or r.timestamp }}</small>
       </div>
 
       <!-- Owner + Flat -->
