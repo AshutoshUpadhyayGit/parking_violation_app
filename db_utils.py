@@ -777,3 +777,92 @@ def force_df_timestamps_to_ist(df, col='timestamp', fmt='%d-%b-%Y %H:%M'):
     df[col] = df[col].dt.floor('min')
     df[f'{col}_fmt'] = df[col].dt.strftime(fmt)
     return df
+
+
+
+
+# -------------------- Watchman Daily Entry helpers (ADD-ON) --------------------
+def find_vehicle_by_last4(last4):
+    """
+    Returns a dict with vehicle details if found in parking_data table by last 4 digits.
+    Returns None if not found.
+    """
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        # Using ILIKE to be case-insensitive
+        cur.execute("""
+            SELECT *
+            FROM parking_data
+            WHERE RIGHT("VehicleNo", 4) ILIKE %s
+            LIMIT 1;
+        """, (last4,))
+        row = cur.fetchone()
+        conn.close()
+        return row if row else None
+    except Exception as e:
+        print("⚠️ find_vehicle_by_last4 failed:", e)
+        return None
+
+def log_watchman_entry(
+    watchman_id=None,
+    watchman_name=None,
+    entry_type=None,
+    last4=None,
+    full_plate=None,
+    vehicle_category=None,
+    purpose_category=None,
+    purpose_subtype=None,
+    flat_no=None,
+    description=None
+):
+    """
+    Insert a row into watchman_entries table.
+    Creates the table if it doesn't already exist.
+    Returns True on success, False on failure.
+    """
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        # Ensure table exists (id SERIAL PRIMARY KEY)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS watchman_entries (
+                id SERIAL PRIMARY KEY,
+                watchman_id TEXT,
+                watchman_name TEXT,
+                entry_type TEXT,
+                last4 TEXT,
+                full_plate TEXT,
+                vehicle_category TEXT,
+                purpose_category TEXT,
+                purpose_subtype TEXT,
+                flat_no TEXT,
+                description TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT (now() AT TIME ZONE 'Asia/Kolkata')
+            );
+        """)
+        # Insert record
+        cur.execute("""
+            INSERT INTO watchman_entries
+            (watchman_id, watchman_name, entry_type, last4, full_plate, vehicle_category,
+             purpose_category, purpose_subtype, flat_no, description, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, (now() AT TIME ZONE 'Asia/Kolkata'));
+        """, (
+            watchman_id,
+            watchman_name,
+            entry_type,
+            last4,
+            full_plate,
+            vehicle_category,
+            purpose_category,
+            purpose_subtype,
+            flat_no,
+            description
+        ))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print("⚠️ log_watchman_entry failed:", e)
+        # Optional: add fallback to Excel for local env (not added here to keep parity with rest of db_utils)
+        return False

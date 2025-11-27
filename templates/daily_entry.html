@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Daily Entry — Watchman</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f5f7fa; }
+    .card { max-width: 720px; margin: 20px auto; }
+    .large-input { font-size: 1.25rem; padding: .6rem; }
+    .btn-save { background: #0d6efd; color: #fff; }
+  </style>
+</head>
+<body>
+  <!-- Centered Success Banner -->
+  <div id="successBanner"
+       style="display:none;
+              position: fixed;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              background: #28a745;
+              color: white;
+              padding: 18px 28px;
+              border-radius: 10px;
+              font-size: 1.3rem;
+              z-index: 99999;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+    Entry Saved Successfully
+  </div>
+
+  <!-- Success Toast -->
+  <div class="position-fixed top-0 end-0 p-3" style="z-index: 9999">
+    <div id="successToast" class="toast align-items-center text-white bg-success border-0" role="alert">
+      <div class="d-flex">
+        <div class="toast-body">
+          Entry Saved Successfully
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container py-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <!-- Back Button -->
+        <div class="mb-3">
+          <a href="{{ url_for('watchman_dashboard') }}" class="btn btn-outline-primary btn-sm">
+            ← Back to Dashboard
+          </a>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">📝 Daily Entry</h5>
+          <div>
+            <strong>Watchman:</strong> {{ watchman }}
+          </div>
+        </div>
+
+        <form id="dailyEntryForm" onsubmit="return false;">
+          <!-- Type -->
+          <div class="mb-3">
+            <label class="form-label">Type</label>
+            <select id="entryType" class="form-select">
+              <option value="Vehicle" selected>Vehicle</option>
+              <option value="Person">Person</option>
+            </select>
+          </div>
+
+          <!-- Vehicle section -->
+          <div id="vehicleSection">
+            <div class="mb-3">
+              <label class="form-label">Last 4 Digits</label>
+              <input id="last4" type="text" maxlength="4" class="form-control large-input" pattern="\d{1,4}" inputmode="numeric" autocomplete="off" />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Full Vehicle Number (auto if known)</label>
+              <input id="fullPlate" type="text" class="form-control" readonly />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Entry Time (IST)</label>
+              <input id="entryTime" type="text" class="form-control" readonly />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Purpose</label>
+              <select id="purposeSelect" class="form-select">
+                <!-- Resident will be auto-selected if found in DB -->
+                <option value="Resident">Resident</option>
+                <option value="Visitor">Visitor</option>
+                <option value="Staff">Staff / Other</option>
+              </select>
+            </div>
+
+            <!-- Resident fields (auto) -->
+            <div id="residentFields" style="display:none;">
+              <div class="mb-3">
+                <label class="form-label">Flat No</label>
+                <input id="flatNoResident" type="text" class="form-control" readonly />
+              </div>
+            </div>
+
+            <!-- Visitor fields -->
+            <div id="visitorFields" style="display:none;">
+              <div class="mb-3">
+                <label class="form-label">Flat To Visit (optional)</label>
+                <input id="flatToVisit" type="text" class="form-control" />
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Visit Type</label>
+                <select id="visitType" class="form-select">
+                  <!-- CATEGORY B (hierarchical feel): grouped visually via separators -->
+                  <optgroup label="Visitor">
+                    <option value="Friend/Relative">Friend / Relative</option>
+                    <option value="Maid">Maid</option>
+                    <option value="Other">Other</option>
+                  </optgroup>
+                  <optgroup label="Transport">
+                    <option value="Cab Service">Cab Service</option>
+                    <option value="Auto">Auto</option>
+                  </optgroup>
+                  <optgroup label="Delivery">
+                    <option value="Delivery-Food">Delivery – Food</option>
+                    <option value="Delivery-Parcel">Delivery – Parcel</option>
+                  </optgroup>
+                </select>
+              </div>
+
+              <div id="otherDescriptionDiv" class="mb-3" style="display:none;">
+                <label class="form-label">Describe (mandatory)</label>
+                <input id="otherDescription" type="text" class="form-control" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Person section -->
+          <div id="personSection" style="display:none;">
+            <div class="mb-3">
+              <label class="form-label">Person Name</label>
+              <input id="personName" type="text" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Category</label>
+              <select id="personCategory" class="form-select">
+                <optgroup label="Visitor">
+                  <option value="Friend/Relative">Friend / Relative</option>
+                  <option value="Maid">Maid</option>
+                  <option value="Other">Other</option>
+                </optgroup>
+                <optgroup label="Worker">
+                  <option value="Worker/Contractor">Worker / Contractor</option>
+                </optgroup>
+                <optgroup label="Delivery">
+<!--                  <option value="DeliveryBoy">Delivery Boy (on foot)</option>-->
+                  <option value="Delivery-Food">Delivery Boy (on foot) – Food</option>
+                  <option value="Delivery-Parcel">Delivery Boy (on foot) – Parcel</option>
+                </optgroup>
+              </select>
+            </div>
+
+            <div id="personOtherDiv" class="mb-3" style="display:none;">
+              <label class="form-label">Describe (mandatory)</label>
+              <input id="personOtherDescription" type="text" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Flat To Visit (optional)</label>
+              <input id="personFlatToVisit" type="text" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Entry Time (IST)</label>
+              <input id="personEntryTime" type="text" class="form-control" readonly />
+            </div>
+          </div>
+
+          <div class="d-grid">
+            <button id="saveBtn" class="btn btn-primary btn-save">Save Entry</button>
+          </div>
+        </form>
+        <hr class="my-4">
+
+<!--        <h5 class="mb-3">📄 Today’s Entries (By You)</h5>-->
+
+<!--        <div id="todaysEntries"></div>-->
+
+        <!-- Collapsible Today's Entries -->
+        <div class="card mt-4">
+          <div class="card-header d-flex justify-content-between align-items-center"
+               data-bs-toggle="collapse" data-bs-target="#todayEntriesCollapse"
+               style="cursor:pointer;">
+              <h5 class="mb-0">📄 Today's Entries (By You)</h5>
+              <span class="text-muted" style="font-size:1.2rem;">▼</span>
+          </div>
+
+          <div id="todayEntriesCollapse" class="collapse">
+              <div id="todaysEntries" class="p-3"></div>
+          </div>
+        </div>
+
+
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="{{ url_for('static', filename='daily_entry.js') }}"></script>
+</body>
+</html>

@@ -1675,6 +1675,107 @@ def watchman_dashboard():
 
 
 
+# -------------------- Daily Entry for Watchman --------------------
+from flask import jsonify
+from db_utils import find_vehicle_by_last4, log_watchman_entry
+
+@app.route('/daily_entry', methods=['GET', 'POST'])
+def daily_entry():
+    """
+    New page for watchman to record entries (Vehicle or Person).
+    GET -> render page
+    POST -> accept JSON form post and persist using db_utils.log_watchman_entry
+    """
+    if 'watchman_id' not in session:
+        flash("Please log in as watchman first.", "warning")
+        return redirect(url_for('watchman_login'))
+
+    if request.method == 'GET':
+        # Render page; watchman name is passed for auto-fill
+        return render_template('daily_entry.html', watchman=session.get('watchman_name', ''))
+
+    # POST handling: expect a JSON body (fetch from fetch/XHR)
+    try:
+        payload = request.get_json() or request.form.to_dict()
+        # Extract fields (keys we will send from front-end)
+        watchman_id = session.get('watchman_id')
+        watchman_name = session.get('watchman_name')
+        entry_type = payload.get('type')  # "Vehicle" or "Person"
+        last4 = payload.get('last4', '') or None
+        full_plate = payload.get('full_plate', '') or None
+        vehicle_category = payload.get('vehicle_category', '') or None  # e.g., Car / Bike / Auto (optional)
+        purpose_category = payload.get('purpose_category', '') or None  # Visitor / Transport / Delivery / Resident etc.
+        purpose_subtype = payload.get('purpose_subtype', '') or None  # Friend/Relative / Maid / Cab / Food / Parcel / Other
+        flat_no = payload.get('flat_no', '') or None
+        description = payload.get('description', '') or None
+
+        ok = log_watchman_entry(
+            watchman_id=watchman_id,
+            watchman_name=watchman_name,
+            entry_type=entry_type,
+            last4=last4,
+            full_plate=full_plate,
+            vehicle_category=vehicle_category,
+            purpose_category=purpose_category,
+            purpose_subtype=purpose_subtype,
+            flat_no=flat_no,
+            description=description
+        )
+        if ok:
+            return jsonify({"status":"success","message":"Entry saved"})
+        else:
+            return jsonify({"status":"error","message":"Failed to save entry"}), 500
+
+    except Exception as ex:
+        print("❌ daily_entry save failed:", ex)
+        return jsonify({"status":"error","message":"Exception occurred"}), 500
+
+
+
+@app.route('/api/find_vehicle')
+def api_find_vehicle():
+    last4 = request.args.get('last4', '').strip()
+    if not last4:
+        return jsonify({"found": False})
+    veh = find_vehicle_by_last4(last4)
+    if veh:
+        # convert psycopg2 RealDictRow to dict (if needed)
+        return jsonify({"found": True, "vehicle": dict(veh)})
+    else:
+        return jsonify({"found": False})
+
+
+
+@app.route('/api/todays_entries')
+def api_todays_entries():
+    if 'watchman_id' not in session:
+        return jsonify([])
+
+    try:
+        watchman_id = session['watchman_id']
+
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        cur.execute("""
+            SELECT *
+            FROM watchman_entries
+            WHERE watchman_id = %s
+              AND created_at::date = (now() AT TIME ZONE 'Asia/Kolkata')::date
+            ORDER BY created_at DESC;
+        """, (watchman_id,))
+
+        rows = cur.fetchall()
+        conn.close()
+
+        return jsonify([dict(r) for r in rows])
+
+    except Exception as e:
+        print("❌ todays_entries error:", e)
+        return jsonify([])
+
+
+
 @app.route('/register_vehicle', methods=['POST'])
 def register_vehicle():
     if 'admin_logged_in' not in session:
