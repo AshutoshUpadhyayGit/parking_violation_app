@@ -1332,6 +1332,21 @@ def get_vehicle_details(vehicle_no):
 
 
 
+def normalize_flat(s):
+    """
+    Normalize flat numbers so input like 'Vista-3005', 'vista 3005',
+    'VISTA_3005', 'ViStA3005' all become 'VISTA3005'.
+    """
+    if not s:
+        return ""
+    # Convert to uppercase
+    s = s.upper()
+    # Remove spaces, hyphens, underscores
+    for ch in [' ', '-', '_']:
+        s = s.replace(ch, '')
+    return s
+
+
 @app.route('/summary', methods=['GET', 'POST'])
 def summary():
     flat_no = None
@@ -1341,7 +1356,9 @@ def summary():
 
     try:
         if request.method == 'POST':
-            flat_no = request.form.get('flat_no', '').strip().upper()
+            # flat_no = request.form.get('flat_no', '').strip().upper()
+            raw_flat = request.form.get('flat_no', '').strip()
+            flat_no = normalize_flat(raw_flat)
 
             if not flat_no:
                 flash("⚠️ Please enter your flat number.", "warning")
@@ -1354,7 +1371,9 @@ def summary():
                     # Normalize column names
                     df.columns = df.columns.str.strip().str.lower()
                     # Ensure FlatNo is string and uppercase
-                    df['flatno'] = df.get('flatno', '').astype(str).str.upper()
+                    # df['flatno'] = df.get('flatno', '').astype(str).str.upper()
+                    df['flatno'] = df['flatno'].astype(str).apply(normalize_flat)
+
                 else:
                     raise ValueError("Empty DataFrame from DB")
             except Exception as db_ex:
