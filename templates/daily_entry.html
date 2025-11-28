@@ -146,6 +146,12 @@
             </div>
 
             <div class="mb-3">
+              <label class="form-label">Contact (optional)</label>
+              <input id="personContact" name="person_contact" type="text" class="form-control" placeholder="Phone or contact (optional)" />
+            </div>
+
+
+            <div class="mb-3">
               <label class="form-label">Category</label>
               <select id="personCategory" class="form-select">
                 <optgroup label="Visitor">
@@ -179,6 +185,14 @@
               <input id="personEntryTime" type="text" class="form-control" readonly />
             </div>
           </div>
+
+                    <!-- Optional Image + Person Contact -->
+          <div class="mb-3">
+            <label class="form-label">Upload Photo (optional)</label>
+            <input id="entryImage" name="image" type="file" capture="environment" accept="image/*" class="form-control" />
+            <div class="form-text">One photo only.</div>
+          </div>
+
 
           <div class="d-grid">
             <button id="saveBtn" class="btn btn-primary btn-save">Save Entry</button>

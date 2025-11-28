@@ -28,6 +28,8 @@
   const visitType = $('visitType');
   const otherDescriptionDiv = $('otherDescriptionDiv');
   const otherDescription = $('otherDescription');
+  const entryImage = $('entryImage');
+
 
   const personCategory = $('personCategory');
   const personOtherDiv = $('personOtherDiv');
@@ -35,6 +37,8 @@
   const personName = $('personName');
   const personFlatToVisit = $('personFlatToVisit');
   const personEntryTime = $('personEntryTime');
+  const personContact = $('personContact');
+
   // Auto-update timestamp when person name typed
   personName.addEventListener('input', () => {
         personEntryTime.value = nowIST();
@@ -189,28 +193,109 @@
     }
 
     // send POST
+//    try {
+//      const resp = await fetch('/daily_entry', {
+//        method: 'POST',
+//        headers: {'Content-Type':'application/json'},
+//        body: JSON.stringify(payload)
+//      });
+//      const j = await resp.json();
+//      if(resp.ok && j.status === 'success'){
+////        alert('Entry saved');
+//        // Show green success toast
+////        const toastEl = document.getElementById('successToast');
+////        const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+////        toast.show();
+//        // Show centered success banner
+//        const banner = document.getElementById('successBanner');
+//        banner.style.display = 'block';
+//        setTimeout(() => {
+//            banner.style.display = 'none';
+//        }, 3000);
+//
+//
+//        // reset minimal fields
+//        last4.value = '';
+//        fullPlate.value = '';
+//        flatToVisit.value = '';
+//        otherDescription.value = '';
+//        personName.value = '';
+//        personOtherDescription.value = '';
+//        personFlatToVisit.value = '';
+//        entryTime.value = nowIST();
+//        personEntryTime.value = nowIST();
+//        purposeSelect.value = 'Resident';
+//        toggleSections();
+//        entryType.value = 'Vehicle';
+//        toggleSections();
+//
+//        visitType.value = 'Friend/Relative';
+//        otherDescriptionDiv.style.display = 'none';
+//        otherDescription.value = '';
+//
+//        residentFields.style.display = 'none';
+//        visitorFields.style.display = 'none';
+//        personOtherDiv.style.display = 'none';
+//
+//        personCategory.value = 'Friend/Relative';
+//        personName.value = '';
+//        personFlatToVisit.value = '';
+//        loadTodaysEntries();
+//
+//      } else {
+//        alert('Failed to save entry: ' + (j.message || 'unknown'));
+//      }
+//    } catch(e){
+//      console.error(e);
+//      alert('Network error while saving entry');
+//    }
+
+
+        // send POST using FormData (works with or without file)
     try {
+      const form = new FormData();
+
+      // Common fields
+      form.append('type', entryType.value);
+      if(entryType.value === 'Vehicle'){
+        form.append('last4', last4.value.trim());
+        form.append('full_plate', fullPlate.value || '');
+        form.append('vehicle_category', '');
+        form.append('purpose_category', purposeSelect.value === 'Resident' ? 'Resident' : 'Visitor');
+        form.append('purpose_subtype', (purposeSelect.value === 'Resident') ? 'Resident' : visitType.value);
+        form.append('flat_no', (purposeSelect.value === 'Resident') ? flatNoResident.value || '' : flatToVisit.value || '');
+        form.append('description', (visitType.value === 'Other') ? otherDescription.value : '');
+      } else {
+        form.append('person_name', personName.value || '');
+        form.append('person_contact', personContact.value || '');
+        form.append('purpose_category', 'Person');
+        form.append('purpose_subtype', personCategory.value);
+        form.append('flat_no', personFlatToVisit.value || '');
+        form.append('description', personOtherDescription.value || '');
+      }
+
+      // Append image if selected
+      const imageInput = document.getElementById('entryImage');
+      if(imageInput && imageInput.files && imageInput.files.length > 0){
+        // only the first file is used (as requested)
+        form.append('image', imageInput.files[0]);
+      }
+
       const resp = await fetch('/daily_entry', {
         method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify(payload)
+        body: form
       });
+
+      // parse JSON
       const j = await resp.json();
+
       if(resp.ok && j.status === 'success'){
-//        alert('Entry saved');
-        // Show green success toast
-//        const toastEl = document.getElementById('successToast');
-//        const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
-//        toast.show();
-        // Show centered success banner
+        // show success banner (your existing code)
         const banner = document.getElementById('successBanner');
         banner.style.display = 'block';
-        setTimeout(() => {
-            banner.style.display = 'none';
-        }, 3000);
+        setTimeout(() => { banner.style.display = 'none'; }, 3000);
 
-
-        // reset minimal fields
+        // clear all fields (existing reset logic)
         last4.value = '';
         fullPlate.value = '';
         flatToVisit.value = '';
@@ -218,24 +303,27 @@
         personName.value = '';
         personOtherDescription.value = '';
         personFlatToVisit.value = '';
+        personContact.value = '';
         entryTime.value = nowIST();
         personEntryTime.value = nowIST();
         purposeSelect.value = 'Resident';
-        toggleSections();
         entryType.value = 'Vehicle';
         toggleSections();
 
         visitType.value = 'Friend/Relative';
         otherDescriptionDiv.style.display = 'none';
         otherDescription.value = '';
-
         residentFields.style.display = 'none';
         visitorFields.style.display = 'none';
         personOtherDiv.style.display = 'none';
-
         personCategory.value = 'Friend/Relative';
         personName.value = '';
         personFlatToVisit.value = '';
+
+        // clear file input
+        if(imageInput) imageInput.value = '';
+
+        // refresh today's entries
         loadTodaysEntries();
 
       } else {
@@ -245,6 +333,7 @@
       console.error(e);
       alert('Network error while saving entry');
     }
+
   });
 
   // Expose a helper for serverless find endpoint - no exposure needed

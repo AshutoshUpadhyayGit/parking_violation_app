@@ -362,14 +362,14 @@ def get_all_violations():
 #     return combined_paths
 
 
-def upload_images_to_supabase(files, save_local=True):
+def upload_images_to_supabase(files, save_local=False):
     """
     Upload images to Supabase storage and optionally also save locally.
     Returns only the public URLs (local save optional).
     """
     image_urls = []
-    upload_folder = "static/uploads"
-    os.makedirs(upload_folder, exist_ok=True)
+    # upload_folder = "static/uploads"
+    # os.makedirs(upload_folder, exist_ok=True)
 
     for i, file in enumerate(files[:4]):
         if not file.filename:
@@ -398,9 +398,9 @@ def upload_images_to_supabase(files, save_local=True):
             print("⚠️ Error uploading to Supabase:", e)
 
         # ✅ Local backup (kept separate so you can comment out easily later)
-        if save_local:
-            local_path = os.path.join(upload_folder, filename)
-            file.save(local_path)
+        # if save_local:
+        #     local_path = os.path.join(upload_folder, filename)
+        #     file.save(local_path)
 
     # ✅ Return only Supabase URLs (avoids duplicate image display)
     return image_urls
@@ -804,6 +804,71 @@ def find_vehicle_by_last4(last4):
         print("⚠️ find_vehicle_by_last4 failed:", e)
         return None
 
+# def log_watchman_entry(
+#     watchman_id=None,
+#     watchman_name=None,
+#     entry_type=None,
+#     last4=None,
+#     full_plate=None,
+#     vehicle_category=None,
+#     purpose_category=None,
+#     purpose_subtype=None,
+#     flat_no=None,
+#     description=None
+# ):
+#     """
+#     Insert a row into watchman_entries table.
+#     Creates the table if it doesn't already exist.
+#     Returns True on success, False on failure.
+#     """
+#     try:
+#         conn = get_connection()
+#         cur = conn.cursor()
+#         # Ensure table exists (id SERIAL PRIMARY KEY)
+#         cur.execute("""
+#             CREATE TABLE IF NOT EXISTS watchman_entries (
+#                 id SERIAL PRIMARY KEY,
+#                 watchman_id TEXT,
+#                 watchman_name TEXT,
+#                 entry_type TEXT,
+#                 last4 TEXT,
+#                 full_plate TEXT,
+#                 vehicle_category TEXT,
+#                 purpose_category TEXT,
+#                 purpose_subtype TEXT,
+#                 flat_no TEXT,
+#                 description TEXT,
+#                 created_at TIMESTAMP WITH TIME ZONE DEFAULT (now() AT TIME ZONE 'Asia/Kolkata')
+#             );
+#         """)
+#         # Insert record
+#         cur.execute("""
+#             INSERT INTO watchman_entries
+#             (watchman_id, watchman_name, entry_type, last4, full_plate, vehicle_category,
+#              purpose_category, purpose_subtype, flat_no, description, created_at)
+#             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, (now() AT TIME ZONE 'Asia/Kolkata'));
+#         """, (
+#             watchman_id,
+#             watchman_name,
+#             entry_type,
+#             last4,
+#             full_plate,
+#             vehicle_category,
+#             purpose_category,
+#             purpose_subtype,
+#             flat_no,
+#             description
+#         ))
+#         conn.commit()
+#         conn.close()
+#         return True
+#     except Exception as e:
+#         print("⚠️ log_watchman_entry failed:", e)
+#         # Optional: add fallback to Excel for local env (not added here to keep parity with rest of db_utils)
+#         return False
+
+
+
 def log_watchman_entry(
     watchman_id=None,
     watchman_name=None,
@@ -814,11 +879,14 @@ def log_watchman_entry(
     purpose_category=None,
     purpose_subtype=None,
     flat_no=None,
-    description=None
+    description=None,
+    owner_contact=None,
+    image_urls=None
 ):
     """
     Insert a row into watchman_entries table.
     Creates the table if it doesn't already exist.
+    Stores optional owner_contact and image_urls (comma separated).
     Returns True on success, False on failure.
     """
     try:
@@ -838,15 +906,25 @@ def log_watchman_entry(
                 purpose_subtype TEXT,
                 flat_no TEXT,
                 description TEXT,
+                owner_contact TEXT,
+                image_urls TEXT,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT (now() AT TIME ZONE 'Asia/Kolkata')
             );
         """)
+        # convert image_urls list -> comma separated string if necessary
+        imgs = None
+        if image_urls:
+            if isinstance(image_urls, (list, tuple)):
+                imgs = ",".join(image_urls)
+            else:
+                imgs = str(image_urls)
+
         # Insert record
         cur.execute("""
             INSERT INTO watchman_entries
             (watchman_id, watchman_name, entry_type, last4, full_plate, vehicle_category,
-             purpose_category, purpose_subtype, flat_no, description, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, (now() AT TIME ZONE 'Asia/Kolkata'));
+             purpose_category, purpose_subtype, flat_no, description, owner_contact, image_urls, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, (now() AT TIME ZONE 'Asia/Kolkata'));
         """, (
             watchman_id,
             watchman_name,
@@ -857,12 +935,74 @@ def log_watchman_entry(
             purpose_category,
             purpose_subtype,
             flat_no,
-            description
+            description,
+            owner_contact,
+            imgs
         ))
         conn.commit()
         conn.close()
         return True
     except Exception as e:
         print("⚠️ log_watchman_entry failed:", e)
-        # Optional: add fallback to Excel for local env (not added here to keep parity with rest of db_utils)
         return False
+
+
+
+
+
+
+# --- Replace the existing upload_images_to_supabase implementation with this ---
+def daily_entry_upload_images_to_supabase(files, bucket='daily_entry_images', save_local=False):
+    """
+    Upload images to Supabase storage and optionally also save locally.
+    Returns only the public URLs (local save optional).
+
+    Args:
+      files: list of FileStorage objects (Flask request.files.getlist('image'))
+      bucket: optional bucket name string. If None, uses SUPABASE_BUCKET constant.
+      save_local: whether to also save a local backup copy in static/uploads
+    """
+    image_urls = []
+    # upload_folder = "static/uploads"
+    # os.makedirs(upload_folder, exist_ok=True)
+
+    # choose bucket (default to configured)
+    target_bucket = bucket
+
+    for i, file in enumerate(files[:4]):  # limit to 4 files even if provided (keeps existing logic)
+        if not file or not getattr(file, "filename", ""):
+            continue
+
+        # Unique filename to avoid collisions
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_name = file.filename.replace(' ', '_')
+        filename = f"{timestamp}_{i+1}_{safe_name}"
+
+        try:
+            file_bytes = file.read()
+            # reset pointer for local save
+            file.seek(0)
+
+            # Upload to chosen Supabase bucket
+            supabase.storage.from_(target_bucket).upload(
+                path=filename,
+                file=file_bytes,
+                file_options={"content-type": file.mimetype or "image/jpeg"}
+            )
+
+            # Get public url
+            public_url = supabase.storage.from_(target_bucket).get_public_url(filename)
+            image_urls.append(public_url)
+
+        except Exception as e:
+            print("⚠️ Error uploading to Supabase:", e)
+
+        # Local backup
+        # if save_local:
+        #     local_path = os.path.join(upload_folder, filename)
+        #     try:
+        #         file.save(local_path)
+        #     except Exception as ex:
+        #         print("⚠️ Failed to save local copy:", ex)
+
+    return image_urls

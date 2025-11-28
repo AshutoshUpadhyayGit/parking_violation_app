@@ -1694,21 +1694,92 @@ def daily_entry():
         # Render page; watchman name is passed for auto-fill
         return render_template('daily_entry.html', watchman=session.get('watchman_name', ''))
 
-    # POST handling: expect a JSON body (fetch from fetch/XHR)
+    # # POST handling: expect a JSON body (fetch from fetch/XHR)
+    # try:
+    #     payload = request.get_json() or request.form.to_dict()
+    #     # Extract fields (keys we will send from front-end)
+    #     watchman_id = session.get('watchman_id')
+    #     watchman_name = session.get('watchman_name')
+    #     entry_type = payload.get('type')  # "Vehicle" or "Person"
+    #     last4 = payload.get('last4', '') or None
+    #     full_plate = payload.get('full_plate', '') or None
+    #     vehicle_category = payload.get('vehicle_category', '') or None  # e.g., Car / Bike / Auto (optional)
+    #     purpose_category = payload.get('purpose_category', '') or None  # Visitor / Transport / Delivery / Resident etc.
+    #     purpose_subtype = payload.get('purpose_subtype', '') or None  # Friend/Relative / Maid / Cab / Food / Parcel / Other
+    #     flat_no = payload.get('flat_no', '') or None
+    #     description = payload.get('description', '') or None
+    #
+    #     ok = log_watchman_entry(
+    #         watchman_id=watchman_id,
+    #         watchman_name=watchman_name,
+    #         entry_type=entry_type,
+    #         last4=last4,
+    #         full_plate=full_plate,
+    #         vehicle_category=vehicle_category,
+    #         purpose_category=purpose_category,
+    #         purpose_subtype=purpose_subtype,
+    #         flat_no=flat_no,
+    #         description=description
+    #     )
+    #     if ok:
+    #         return jsonify({"status":"success","message":"Entry saved"})
+    #     else:
+    #         return jsonify({"status":"error","message":"Failed to save entry"}), 500
+    #
+    # except Exception as ex:
+    #     print("❌ daily_entry save failed:", ex)
+    #     return jsonify({"status":"error","message":"Exception occurred"}), 500
+
+
+    # POST handling: accept JSON or multipart/form-data (for file)
     try:
-        payload = request.get_json() or request.form.to_dict()
-        # Extract fields (keys we will send from front-end)
+        # Try JSON first (fetch/XHR sends JSON)
+        payload = request.get_json(silent=True) or request.form.to_dict()
+
+        # If multipart/form-data (file upload) then payload values may be in request.form
+        if not isinstance(payload, dict):
+            payload = {}
+
+        # Basic fields (cover both JSON keys and form keys)
         watchman_id = session.get('watchman_id')
         watchman_name = session.get('watchman_name')
-        entry_type = payload.get('type')  # "Vehicle" or "Person"
-        last4 = payload.get('last4', '') or None
-        full_plate = payload.get('full_plate', '') or None
-        vehicle_category = payload.get('vehicle_category', '') or None  # e.g., Car / Bike / Auto (optional)
-        purpose_category = payload.get('purpose_category', '') or None  # Visitor / Transport / Delivery / Resident etc.
-        purpose_subtype = payload.get('purpose_subtype', '') or None  # Friend/Relative / Maid / Cab / Food / Parcel / Other
-        flat_no = payload.get('flat_no', '') or None
-        description = payload.get('description', '') or None
 
+        entry_type = payload.get('type') or request.form.get('type')  # "Vehicle" or "Person"
+        last4 = (payload.get('last4') or request.form.get('last4') or '').strip() or None
+        full_plate = (payload.get('full_plate') or request.form.get('full_plate') or '').strip() or None
+        vehicle_category = (payload.get('vehicle_category') or request.form.get('vehicle_category') or '').strip() or None
+        purpose_category = (payload.get('purpose_category') or request.form.get('purpose_category') or '').strip() or None
+        purpose_subtype = (payload.get('purpose_subtype') or request.form.get('purpose_subtype') or '').strip() or None
+        flat_no = (payload.get('flat_no') or request.form.get('flat_no') or '').strip() or None
+        description = (payload.get('description') or request.form.get('description') or '').strip() or None
+
+        # Optional contact (person contact)
+        owner_contact = (payload.get('person_contact') or payload.get('contact') or
+                         request.form.get('person_contact') or request.form.get('contact') or '').strip() or None
+
+        # Optional image(s) - single optional image for daily entry
+        uploaded_files = []
+        # If JSON body, no files. If multipart/form-data, request.files will have it.
+        if request.files:
+            # support both 'image' (single) and 'images' (list) naming
+            if 'image' in request.files:
+                # single or multiple
+                f = request.files.getlist('image')
+                uploaded_files.extend(f)
+            if 'images' in request.files:
+                uploaded_files.extend(request.files.getlist('images'))
+
+        image_urls = []
+        if uploaded_files:
+            # Upload to the dedicated daily-entry bucket
+            from db_utils import daily_entry_upload_images_to_supabase
+            try:
+                image_urls = daily_entry_upload_images_to_supabase(uploaded_files, bucket='daily_entry_images', save_local=False)
+            except Exception as e:
+                print("⚠️ daily_entry image upload failed:", e)
+                image_urls = []
+
+        # Pass image_urls and owner_contact through to DB helper
         ok = log_watchman_entry(
             watchman_id=watchman_id,
             watchman_name=watchman_name,
@@ -1719,16 +1790,20 @@ def daily_entry():
             purpose_category=purpose_category,
             purpose_subtype=purpose_subtype,
             flat_no=flat_no,
-            description=description
+            description=description,
+            owner_contact = owner_contact,
+            image_urls = image_urls
+            # NOTE: we'll update log_watchman_entry next so it can accept owner_contact & image_urls
         )
-        if ok:
-            return jsonify({"status":"success","message":"Entry saved"})
-        else:
-            return jsonify({"status":"error","message":"Failed to save entry"}), 500
+
+        # --- AFTER INSERT: update row with image_urls and owner_contact (or insert them directly if modifying the function) ---
+        # We'll modify log_watchman_entry next to accept owner_contact and image_urls directly.
+        return jsonify({"status":"success","message":"Entry saved"}) if ok else (jsonify({"status":"error","message":"Failed to save entry"}), 500)
 
     except Exception as ex:
         print("❌ daily_entry save failed:", ex)
         return jsonify({"status":"error","message":"Exception occurred"}), 500
+
 
 
 
