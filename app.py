@@ -1798,6 +1798,7 @@ def daily_entry():
                 print("⚠️ daily_entry image upload failed:", e)
                 image_urls = []
 
+        print("DEBUG image_urls:", image_urls)
         # Pass image_urls and owner_contact through to DB helper
         ok = log_watchman_entry(
             watchman_id=watchman_id,
@@ -1812,8 +1813,8 @@ def daily_entry():
             description=description,
             owner_contact = owner_contact,
             image_urls = image_urls
-            # NOTE: we'll update log_watchman_entry next so it can accept owner_contact & image_urls
         )
+
 
         # --- AFTER INSERT: update row with image_urls and owner_contact (or insert them directly if modifying the function) ---
         # We'll modify log_watchman_entry next to accept owner_contact and image_urls directly.
@@ -1840,6 +1841,34 @@ def api_find_vehicle():
 
 
 
+# @app.route('/api/todays_entries')
+# def api_todays_entries():
+#     if 'watchman_id' not in session:
+#         return jsonify([])
+#
+#     try:
+#         watchman_id = session['watchman_id']
+#
+#         conn = get_connection()
+#         cur = conn.cursor(cursor_factory=RealDictCursor)
+#
+#         cur.execute("""
+#             SELECT *
+#             FROM watchman_entries
+#             WHERE watchman_id = %s
+#               AND created_at::date = (now() AT TIME ZONE 'Asia/Kolkata')::date
+#             ORDER BY created_at DESC;
+#         """, (watchman_id,))
+#
+#         rows = cur.fetchall()
+#         conn.close()
+#
+#         return jsonify([dict(r) for r in rows])
+#
+#     except Exception as e:
+#         print("❌ todays_entries error:", e)
+#         return jsonify([])
+
 @app.route('/api/todays_entries')
 def api_todays_entries():
     if 'watchman_id' not in session:
@@ -1854,10 +1883,9 @@ def api_todays_entries():
         cur.execute("""
             SELECT *
             FROM watchman_entries
-            WHERE watchman_id = %s
-              AND created_at::date = (now() AT TIME ZONE 'Asia/Kolkata')::date
+            WHERE created_at::date = (now() AT TIME ZONE 'Asia/Kolkata')::date
             ORDER BY created_at DESC;
-        """, (watchman_id,))
+        """)
 
         rows = cur.fetchall()
         conn.close()

@@ -977,7 +977,7 @@ def daily_entry_upload_images_to_supabase(files, bucket='daily_entry_images', sa
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_name = file.filename.replace(' ', '_')
         filename = f"{timestamp}_{i+1}_{safe_name}"
-
+        from io import BytesIO
         try:
             file_bytes = file.read()
             # reset pointer for local save
