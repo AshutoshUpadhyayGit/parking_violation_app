@@ -1770,11 +1770,26 @@ def daily_entry():
         purpose_category = (payload.get('purpose_category') or request.form.get('purpose_category') or '').strip() or None
         purpose_subtype = (payload.get('purpose_subtype') or request.form.get('purpose_subtype') or '').strip() or None
         flat_no = (payload.get('flat_no') or request.form.get('flat_no') or '').strip() or None
-        description = (payload.get('description') or request.form.get('description') or '').strip() or None
+        # name = (payload.get('name') or request.form.get('name') or '').strip() or None
+        name = (payload.get('person_name')
+                or request.form.get('person_name')
+                or payload.get('full_plate')
+                or request.form.get('full_plate')
+                or payload.get('last4')
+                or request.form.get('last4')
+                or '').strip() or None
 
         # Optional contact (person contact)
-        owner_contact = (payload.get('person_contact') or payload.get('contact') or
-                         request.form.get('person_contact') or request.form.get('contact') or '').strip() or None
+        # owner_contact = (payload.get('person_contact') or payload.get('contact') or
+        #                  request.form.get('person_contact') or request.form.get('contact') or '').strip() or None
+
+        owner_contact = (
+                payload.get('owner_contact')
+                or payload.get('person_contact')
+                or request.form.get('owner_contact')
+                or request.form.get('person_contact')
+        )
+        owner_contact = (owner_contact or '').strip() or None
 
         # Optional image(s) - single optional image for daily entry
         uploaded_files = []
@@ -1810,7 +1825,7 @@ def daily_entry():
             purpose_category=purpose_category,
             purpose_subtype=purpose_subtype,
             flat_no=flat_no,
-            description=description,
+            name=name,
             owner_contact = owner_contact,
             image_urls = image_urls
         )
@@ -2072,6 +2087,7 @@ def watchman_observe():
     except Exception as e:
         import traceback; traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
+
 
 
 # ---------------------- MAIN ---------------------- #

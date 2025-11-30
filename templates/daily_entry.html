@@ -82,6 +82,19 @@
             </div>
 
             <div class="mb-3">
+              <label class="form-label">Contact (Mandatory)</label>
+
+              <div class="input-group">
+                <input id="vehicleContact" name="vehicle_contact" type="text" class="form-control"
+                       placeholder="Phone or contact (Mandatory)">
+                <button id="vehicleCallBtn" class="btn btn-outline-secondary" type="button">
+                  📞
+                </button>
+              </div>
+            </div>
+
+
+            <div class="mb-3">
               <label class="form-label">Entry Time (IST)</label>
               <input id="entryTime" type="text" class="form-control" readonly />
             </div>
@@ -145,10 +158,21 @@
               <input id="personName" type="text" class="form-control" />
             </div>
 
+<!--            <div class="mb-3">-->
+<!--              <label class="form-label">Contact (optional)</label>-->
+<!--              <input id="personContact" name="person_contact" type="text" class="form-control" placeholder="Phone or contact (optional)" />-->
+<!--            </div>-->
             <div class="mb-3">
-              <label class="form-label">Contact (optional)</label>
-              <input id="personContact" name="person_contact" type="text" class="form-control" placeholder="Phone or contact (optional)" />
+              <label class="form-label">Contact (Mandatory)</label>
+
+              <div class="input-group">
+                <input id="personContact" name="person_contact" type="text" class="form-control" placeholder="Phone or contact (Mandatory)">
+                <button id="callBtn" class="btn btn-outline-secondary" type="button">
+                  📞
+                </button>
+              </div>
             </div>
+
 
 
             <div class="mb-3">
@@ -203,7 +227,8 @@
 
 
           <div class="d-grid">
-            <button id="saveBtn" class="btn btn-primary btn-save">Save Entry</button>
+<!--            <button id="saveBtn" class="btn btn-primary btn-save">Save Entry</button>-->
+            <button id="saveBtn" class="btn btn-primary btn-save" disabled>Save Entry</button>
           </div>
         </form>
         <hr class="my-4">

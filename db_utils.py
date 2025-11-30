@@ -879,7 +879,7 @@ def log_watchman_entry(
     purpose_category=None,
     purpose_subtype=None,
     flat_no=None,
-    description=None,
+    name=None,
     owner_contact=None,
     image_urls=None
 ):
@@ -905,7 +905,7 @@ def log_watchman_entry(
                 purpose_category TEXT,
                 purpose_subtype TEXT,
                 flat_no TEXT,
-                description TEXT,
+                name TEXT,
                 owner_contact TEXT,
                 image_urls TEXT,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT (now() AT TIME ZONE 'Asia/Kolkata')
@@ -923,7 +923,7 @@ def log_watchman_entry(
         cur.execute("""
             INSERT INTO watchman_entries
             (watchman_id, watchman_name, entry_type, last4, full_plate, vehicle_category,
-             purpose_category, purpose_subtype, flat_no, description, owner_contact, image_urls, created_at)
+             purpose_category, purpose_subtype, flat_no, name, owner_contact, image_urls, created_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, (now() AT TIME ZONE 'Asia/Kolkata'));
         """, (
             watchman_id,
@@ -935,7 +935,7 @@ def log_watchman_entry(
             purpose_category,
             purpose_subtype,
             flat_no,
-            description,
+            name,
             owner_contact,
             imgs
         ))
@@ -1006,3 +1006,5 @@ def daily_entry_upload_images_to_supabase(files, bucket='daily_entry_images', sa
         #         print("⚠️ Failed to save local copy:", ex)
 
     return image_urls
+
+

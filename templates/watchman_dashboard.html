@@ -97,6 +97,7 @@
             <th>Slot</th>
             <th>Status</th>
             <th>Watchman Note</th>
+            <th>Vehicle Owner Contact</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -127,6 +128,17 @@
             <td class="small-muted">
               {{ r.WatchmanNote or '—' }}
             </td>
+
+            <td>
+                {{ r.OwnerContact or '—' }}
+
+                {% if r.OwnerContact %}
+                <a href="tel:{{ r.OwnerContact }}" style="margin-left:5px;font-size:18px; text-decoration:none;">
+                    📞
+                </a>
+                {% endif %}
+            </td>
+
 
             <td class="action-btns">
               {# If this row is UNKNOWN, watchman should NOT take action (per requirement) #}
@@ -311,6 +323,18 @@
       <div class="mt-1">
         <strong>Slot:</strong> {{ r.parked_slot }}
       </div>
+
+      <div class="mt-2">
+          <strong>Owner Contact:</strong>
+          {{ r.OwnerContact or '—' }}
+
+          {% if r.OwnerContact %}
+          <a href="tel:{{ r.OwnerContact }}" style="margin-left:6px; font-size:18px; text-decoration:none;">
+              📞
+          </a>
+          {% endif %}
+      </div>
+
 
       <div class="mt-1">
         <strong>Admin Status:</strong> {{ r.Status }}

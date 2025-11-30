@@ -4,6 +4,14 @@
   // helpers
   function $(id) { return document.getElementById(id); }
 
+  function normalizeFlat(inp){
+        const letters = (inp.match(/[A-Za-z]+/g) || []).join('').toUpperCase();
+        const numbers = (inp.match(/[0-9]+/g) || []).join('');
+        if (!letters || !numbers) return inp.toUpperCase();
+        return `${letters}-${numbers}`;
+    }
+
+
   function nowIST() {
     try {
       const d = new Date();
@@ -23,6 +31,7 @@
   const purposeSelect = $('purposeSelect');
   const residentFields = $('residentFields');
   const flatNoResident = $('flatNoResident');
+
   const visitorFields = $('visitorFields');
   const flatToVisit = $('flatToVisit');
   const visitType = $('visitType');
@@ -35,8 +44,13 @@
   const personOtherDescription = $('personOtherDescription');
   const personName = $('personName');
   const personFlatToVisit = $('personFlatToVisit');
+
   const personEntryTime = $('personEntryTime');
   const personContact = $('personContact');
+  const vehicleContact = $('vehicleContact');
+  const vehicleCallBtn = $('vehicleCallBtn');
+  const callBtn = $('callBtn');
+
 
   // Auto timestamp on name typing
   personName.addEventListener('input', () => {
@@ -69,15 +83,35 @@
   entryTime.value = nowIST();
   personEntryTime.value = nowIST();
 
-  function toggleSections() {
-    if (entryType.value === 'Vehicle') {
-      vehicleSection.style.display = '';
-      personSection.style.display = 'none';
-    } else {
-      vehicleSection.style.display = 'none';
-      personSection.style.display = '';
+//  function toggleSections() {
+//    if (entryType.value === 'Vehicle') {
+//      vehicleSection.style.display = '';
+//      personSection.style.display = 'none';
+//    } else {
+//      vehicleSection.style.display = 'none';
+//      personSection.style.display = '';
+//    }
+//  }
+
+  function toggleSections(){
+        if(entryType.value === 'Vehicle'){
+            vehicleSection.style.display = '';
+            personSection.style.display = 'none';
+
+            // Vehicle default – disable until last4 is validated
+            saveBtn.disabled = true;
+            saveBtn.classList.add("disabled");
+
+        } else {
+            vehicleSection.style.display = 'none';
+            personSection.style.display = '';
+
+            // Person entries ALWAYS allowed → enable
+            saveBtn.disabled = false;
+            saveBtn.classList.remove("disabled");
+        }
     }
-  }
+
 
   entryType.addEventListener('change', toggleSections);
 
@@ -113,12 +147,20 @@
         if (res.ok) {
           const j = await res.json();
           if (j.found) {
+            // Disable save because resident vehicle entries are not allowed
+            saveBtn.disabled = true;
+            saveBtn.classList.add("disabled");
+
             fullPlate.value = j.vehicle.VehicleNo || '';
             purposeSelect.value = 'Resident';
             residentFields.style.display = '';
             flatNoResident.value = j.vehicle.FlatNo || '';
             visitorFields.style.display = 'none';
           } else {
+            // Visitor → allow saving
+            saveBtn.disabled = false;
+            saveBtn.classList.remove("disabled");
+
             fullPlate.value = '';
             purposeSelect.value = 'Visitor';
             residentFields.style.display = 'none';
@@ -128,6 +170,28 @@
       } catch { }
     }
   });
+
+  // Phone dialer button
+    callBtn.addEventListener('click', () => {
+        const num = personContact.value.trim();
+        if (!num) {
+            alert("No number entered");
+            return;
+        }
+        window.location.href = `tel:${num}`;
+    });
+
+
+  vehicleCallBtn.addEventListener('click', () => {
+        const num = vehicleContact.value.trim();
+        if (!num) {
+            alert("No number entered");
+            return;
+        }
+        window.location.href = `tel:${num}`;
+    });
+
+
 
   // SAVE handler
   saveBtn.addEventListener('click', async function () {
@@ -161,10 +225,13 @@
       form.append('last4', last4.value.trim());
       form.append('full_plate', fullPlate.value || '');
       form.append('vehicle_category', '');
+      form.append('owner_contact', vehicleContact.value || '');
       form.append('purpose_category', purposeSelect.value === 'Resident' ? 'Resident' : 'Visitor');
       form.append('purpose_subtype', purposeSelect.value === 'Resident' ? 'Resident' : visitType.value);
       form.append('flat_no', purposeSelect.value === 'Resident' ? flatNoResident.value || '' : flatToVisit.value || '');
-      form.append('description', visitType.value === 'Other' ? otherDescription.value : '');
+//      form.append('description', visitType.value === 'Other' ? otherDescription.value : '');
+      form.append('person_name', fullPlate.value || last4.value);
+
 
     } else {
       form.append('person_name', personName.value || '');
@@ -199,10 +266,15 @@
         personOtherDescription.value = '';
         personFlatToVisit.value = '';
         personContact.value = '';
+        vehicleContact.value = '';
+
         imageInput.value = '';
         imagePreview.style.display = 'none';
 
         entryType.value = 'Vehicle';
+        saveBtn.disabled = true;
+        saveBtn.classList.add("disabled");
+
         purposeSelect.value = 'Resident';
         visitType.value = 'Friend/Relative';
         personCategory.value = 'Friend/Relative';
@@ -323,6 +395,27 @@
                 ${e.purpose_subtype ? '(' + e.purpose_subtype + ')' : ''}</div>
               <div><strong>Flat:</strong> ${e.flat_no || '-'}</div>
 
+
+              <!-- VEHICLE FULL PLATE OR PERSON NAME -->
+                ${
+                  e.entry_type === 'Vehicle'
+                  ? `<div><strong>Vehicle No:</strong> ${e.full_plate || e.last4 || '-'}</div>`
+                  : `<div><strong>Name:</strong> ${e.name || '-'}</div>`
+                }
+
+                <!-- CONTACT NUMBER + DIAL BUTTON -->
+                ${
+                  e.owner_contact
+                    ? `<div><strong>Visitor Contact:</strong>
+                         <a href="tel:${e.owner_contact}"
+                            style="text-decoration:none; font-weight:bold;">
+                            ${e.owner_contact} 📞
+                         </a>
+                       </div>`
+                    : ''
+                }
+
+
               ${imgs.length > 0 ? `
                 <div class="mt-2">
                   <strong>Image:</strong><br>
@@ -358,6 +451,16 @@
             modal.show();
         }
     });
+
+  document.addEventListener('click', function(e){
+        if(e.target.classList.contains('dial-btn')){
+            const num = e.target.getAttribute('data-num');
+            if (num) {
+                window.location.href = `tel:${num}`;
+            }
+        }
+    });
+
 
 
 })();
