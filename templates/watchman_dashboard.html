@@ -195,6 +195,19 @@
         <strong>Note:</strong> {{ r.WatchmanNote or '—' }}
       </div>
 
+      <div class="mt-2">
+          <strong>Vehicle Owner Contact:</strong>
+          {{ r.OwnerContact or '—' }}
+
+          {% if r.OwnerContact %}
+          <a href="tel:{{ r.OwnerContact }}"
+             style="margin-left:6px; font-size:18px; text-decoration:none;">
+              📞
+          </a>
+          {% endif %}
+      </div>
+
+
       <!-- Images -->
       {% if r.image_path %}
         {% set imgs = r.image_path.split(',') %}
