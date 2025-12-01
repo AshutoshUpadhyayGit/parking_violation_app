@@ -120,8 +120,22 @@
             <!-- Visitor fields -->
             <div id="visitorFields" style="display:none;">
               <div class="mb-3">
-                <label class="form-label">Flat To Visit (optional)</label>
-                <input id="flatToVisit" type="text" class="form-control" />
+                <label>Flat To Visit</label>
+                <div class="input-group mb-2">
+                    <input type="text" id="flatToVisit" class="form-control" placeholder="e.g., Vista-3005">
+                    <button class="btn btn-outline-secondary" id="fetchOwnerBtn" type="button">✔</button>
+                </div>
+
+                <div class="mb-2">
+                    <label>Owner Contact</label>
+                    <input type="text" id="ownerContactField" class="form-control" readonly>
+                </div>
+
+                <div class="mb-3">
+                    <label>Owner Parking Slot</label>
+                    <input type="text" id="parkingSlotField" class="form-control" readonly>
+                </div>
+
               </div>
 
               <div class="mb-3">
@@ -199,10 +213,28 @@
               <input id="personOtherDescription" type="text" class="form-control" />
             </div>
 
-            <div class="mb-3">
-              <label class="form-label">Flat To Visit (optional)</label>
-              <input id="personFlatToVisit" type="text" class="form-control" />
+<!--            <div class="mb-3">-->
+<!--              <label class="form-label">Flat To Visit (optional)</label>-->
+<!--              <input id="personFlatToVisit" type="text" class="form-control" />-->
+<!--            </div>-->
+
+            <div class="input-group mb-2 mt-2">
+                <input type="text" id="personFlatToVisit" class="form-control" placeholder="e.g., Vista-3005">
+                <button class="btn btn-outline-secondary" id="fetchOwnerBtnPerson" type="button">✔</button>
             </div>
+
+            <div class="mb-2">
+                <label>Owner Contact</label>
+                <input type="text" id="ownerContactFieldPerson" class="form-control" readonly>
+            </div>
+
+            <div class="mb-3">
+                <label>Owner Parking Slot</label>
+                <input type="text" id="parkingSlotFieldPerson" class="form-control" readonly>
+            </div>
+
+
+
 
             <div class="mb-3">
               <label class="form-label">Entry Time (IST)</label>
@@ -228,7 +260,8 @@
 
           <div class="d-grid">
 <!--            <button id="saveBtn" class="btn btn-primary btn-save">Save Entry</button>-->
-            <button id="saveBtn" class="btn btn-primary btn-save" disabled>Save Entry</button>
+
+            <button id="saveBtn" class="btn btn-primary btn-save" disabled>Save Entry & Inform Owner</button>
           </div>
         </form>
         <hr class="my-4">

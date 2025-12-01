@@ -868,6 +868,62 @@ def find_vehicle_by_last4(last4):
 #         return False
 
 
+import re
+
+def normalize_flat_no(value):
+    if not value:
+        return None
+    # 1. Uppercase
+    v = value.upper()
+    # 2. Remove anything NOT A–Z or 0–9
+    v = re.sub(r'[^A-Z0-9]', '', v)
+    return v
+
+
+
+
+
+
+def find_parking_by_flat_normalized(raw_flat):
+    try:
+        print("raw_flat : ", raw_flat)
+        norm = normalize_flat_no(raw_flat)
+        print("norm : ", norm)
+        if not norm:
+            return None
+
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT "FlatNo", "ParkingSlot", "OwnerContact"
+            FROM parking_data
+            WHERE REGEXP_REPLACE("FlatNo", '[^A-Za-z0-9]+', '', 'g') =
+                    REGEXP_REPLACE(%s, '[^A-Za-z0-9]+', '', 'g')
+            ORDER BY id DESC
+            LIMIT 1;
+        """, (norm,))
+
+        row = cur.fetchone()
+        print("row : ", row)
+
+        conn.close()
+
+        if not row:
+            return None
+
+        return {
+            "FlatNo": row['FlatNo'],
+            "ParkingSlot": row['ParkingSlot'],
+            "OwnerContact": row['OwnerContact']
+        }
+
+    except Exception as e:
+
+        print("⚠️ find_parking_by_flat failed:", e)
+        return None
+
+
 
 def log_watchman_entry(
     watchman_id=None,

@@ -1,5 +1,15 @@
 // static/daily_entry.js
+
+if (!window.__dailyEntryInit) {
+window.__dailyEntryInit = true;
 (function () {
+
+  if (window.dailyEntryLoaded) return;
+  window.dailyEntryLoaded = true;
+  // keep a set of already-rendered entry keys so repeated calls don't duplicate cards
+  window.__renderedTodayEntryKeys = window.__renderedTodayEntryKeys || new Set();
+
+
 
   // helpers
   function $(id) { return document.getElementById(id); }
@@ -10,6 +20,19 @@
         if (!letters || !numbers) return inp.toUpperCase();
         return `${letters}-${numbers}`;
     }
+
+
+  async function fetchOwnerInfo(flatInput) {
+        if (!flatInput) return null;
+        try {
+            const r = await fetch(`/api/owner_info?flat=${encodeURIComponent(flatInput)}`);
+            return await r.json();
+        } catch (e) {
+            console.error("Owner lookup error:", e);
+            return null;
+        }
+    }
+
 
 
   function nowIST() {
@@ -58,6 +81,8 @@
   });
 
   const saveBtn = $('saveBtn');
+  const informOwnerBtn = $('informOwnerBtn');
+
 
   // Image preview
   const imageInput = document.getElementById('entryImage');
@@ -192,6 +217,103 @@
     });
 
 
+  // ⬇️ NEW: normalize flat and fetch owner info from backend
+    async function fetchOwnerInfoForFlat(rawFlat) {
+      const flat = (rawFlat || '').trim();
+      if (!flat) return null;
+
+      const resp = await fetch(`/api/owner_info?flat=${encodeURIComponent(flat)}`);
+      if (!resp.ok) return null;
+
+      const data = await resp.json();
+      // expected: { found: true/false, flat_normalized, owner_contact, parking_slot }
+      if (!data.found) return null;
+      return data;   // { owner_contact, parking_slot, flat_normalized }
+    }
+
+
+  document.getElementById('fetchOwnerBtn').addEventListener('click', async () => {
+        const flat = flatToVisit.value.trim();
+        const info = await fetchOwnerInfo(flat);
+
+        if (!info || !info.found) {
+            ownerContactField.value = "Not Available";
+            parkingSlotField.value = "-";
+            return;
+        }
+
+        ownerContactField.value = info.owner_contact || "Not Available";
+        parkingSlotField.value = info.parking_slot || "-";
+    });
+
+
+    document.getElementById('fetchOwnerBtnPerson').addEventListener('click', async () => {
+        const flat = personFlatToVisit.value.trim();
+        const info = await fetchOwnerInfo(flat);
+
+        if (!info || !info.found) {
+            ownerContactFieldPerson.value = "Not Available";
+            parkingSlotFieldPerson.value = "-";
+            return;
+        }
+
+        ownerContactFieldPerson.value = info.owner_contact || "Not Available";
+        parkingSlotFieldPerson.value = info.parking_slot || "-";
+    });
+
+
+  async function sendWhatsAppAfterSave() {
+
+        let flat = (entryType.value === "Vehicle")
+                    ? flatToVisit.value.trim()
+                    : personFlatToVisit.value.trim();
+
+        const info = await fetchOwnerInfo(flat);
+        if (!info || !info.found || !info.owner_contact) {
+            alert("Owner contact not available");
+            return;
+        }
+
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-IN');
+        const timeStr = now.toLocaleTimeString('en-IN');
+
+        const phone = info.owner_contact;
+
+        const imageUrl = previewImg && previewImg.src ? previewImg.src : null;
+
+        // 📝 Build dynamic message
+        let msg = `   🚨 *TenX Security - VISITOR Alert !!!* \n\n`;
+
+        msg += `   *Approve (Y) or Reject (N) - As Visitor is waiting* \n\n`;
+
+        msg += `*Flat:* ${flat}\n`;
+
+
+        if (entryType.value === "Vehicle") {
+            msg += `*Vehicle No (Last 4 digit):* ${last4.value || "-"}\n`;
+        } else {
+            msg += `*Visitor:* ${personName.value || "-"}\n`;
+        }
+
+        msg += `*Purpose:* ${purposeSelect.value}${visitType.value ? " - " + visitType.value : ""}\n`;
+        msg += `*Parking Slot:* ${info.parking_slot || "-"}\n`;
+        msg += `*Date:* ${dateStr}\n`;
+        msg += `*Time:* ${timeStr}\n\n`;
+
+        if (imageUrl) {
+            msg += `*📷 Visitor Image is recorded by Security Team*\n\n`;
+        }
+
+
+        const url = `/whatsapp_redirect?phone=${phone}&msg=${encodeURIComponent(msg)}`;
+
+
+        window.open(url, "_blank");
+    }
+
+
+
 
   // SAVE handler
   saveBtn.addEventListener('click', async function () {
@@ -257,6 +379,9 @@
         banner.style.display = 'block';
         setTimeout(() => banner.style.display = 'none', 3000);
 
+        await sendWhatsAppAfterSave();
+
+
         // Reset everything
         last4.value = '';
         fullPlate.value = '';
@@ -283,7 +408,8 @@
         personOtherDiv.style.display = 'none';
 
         toggleSections();
-        loadTodaysEntries();
+//        loadTodaysEntries();
+        await loadTodaysEntries()
 
       } else {
         alert("Failed: " + j.message);
@@ -297,6 +423,7 @@
   });
 
   toggleSections();
+
 
   // ----------- Timestamp formatting ----------
   function ordinal(n) {
@@ -327,116 +454,133 @@
   }
 
   // ----------- LOAD TODAY'S ENTRIES ----------
-  async function loadTodaysEntries() {
-    try {
-      const res = await fetch('/api/todays_entries');
-      const entries = await res.json();
-      const container = document.getElementById('todaysEntries');
-      container.innerHTML = '';
+  // --- SAFE DEDUPE STORE ---
+    window.__todayKeys = window.__todayKeys || new Set();
 
-      entries.forEach(e => {
+    async function loadTodaysEntries() {
+      try {
+        const res = await fetch('/api/todays_entries');
+        const entries = await res.json();
+        const container = document.getElementById('todaysEntries');
 
-        // ------- FIXED IMAGE NORMALIZER --------
-        let imgs = [];
+        // ALWAYS clear UI & dedupe set for a fresh clean render
+        container.innerHTML = '';
+        window.__todayKeys.clear();
 
-        if (Array.isArray(e.image_urls)) {
-          imgs = e.image_urls;
-        }
-        else if (typeof e.image_urls === "string") {
-          if (e.image_urls.trim().startsWith("[")) {
-            try {
-              const parsed = JSON.parse(e.image_urls);
-              if (Array.isArray(parsed)) imgs = parsed;
-            } catch {
-              imgs = [];
+        entries.forEach(e => {
+
+          // --- UNIQUE KEY FOR DEDUPE ---
+          const entryKey = (
+            e.id ||
+            e.entry_id ||
+            (e.created_at + (e.full_plate || e.last4 || e.name || e.flat_no || ''))
+          ).toString();
+
+          if (window.__todayKeys.has(entryKey)) return;
+          window.__todayKeys.add(entryKey);
+
+          // ------- FIXED IMAGE NORMALIZER --------
+          let imgs = [];
+
+          if (Array.isArray(e.image_urls)) {
+            imgs = e.image_urls;
+          }
+          else if (typeof e.image_urls === "string") {
+            if (e.image_urls.trim().startsWith("[")) {
+              try {
+                const parsed = JSON.parse(e.image_urls);
+                if (Array.isArray(parsed)) imgs = parsed;
+              } catch {
+                imgs = [];
+              }
+            }
+            else if (e.image_urls.startsWith("http")) {
+              imgs = [e.image_urls];
             }
           }
-          else if (e.image_urls.startsWith("http")) {
-            imgs = [e.image_urls];
-          }
-        }
 
-        //--------------------------------------
+          //--------------------------------------
 
-        const collapseId = "entry_" + Math.random().toString(36).substring(2, 8);
-        const ts = formatStoredTimestamp(e.created_at);
-        const [datePart, timePart] = ts.split(" - ");
+          const collapseId = "entry_" + Math.random().toString(36).substring(2, 8);
+          const ts = formatStoredTimestamp(e.created_at);
+          const [datePart, timePart] = ts.split(" - ");
 
-        const card = document.createElement("div");
-        card.className = "card mb-2 shadow-sm";
+          const card = document.createElement("div");
+          card.className = "card mb-2 shadow-sm";
 
-        card.innerHTML = `
-          <div class="card-header d-flex justify-content-between align-items-center p-3"
-               style="cursor:pointer;"
-               data-bs-toggle="collapse"
-               data-bs-target="#${collapseId}"
-               aria-expanded="false"
-               aria-controls="${collapseId}">
+          card.innerHTML = `
+            <div class="card-header d-flex justify-content-between align-items-center p-3"
+                 style="cursor:pointer;"
+                 data-bs-toggle="collapse"
+                 data-bs-target="#${collapseId}"
+                 aria-expanded="false"
+                 aria-controls="${collapseId}">
 
-            <div>
-                <div style="font-weight:700;">${timePart}</div>
-                <div style="font-size:0.85rem; color:#555;">${datePart}</div>
+              <div>
+                  <div style="font-weight:700;">${timePart}</div>
+                  <div style="font-size:0.85rem; color:#555;">${datePart}</div>
+              </div>
+
+              <div class="ms-3 text-end">
+                  <div style="font-size:0.9rem; color:#444;">${e.entry_type || '-'}</div>
+                  <div style="font-size:0.8rem; color:#777;">
+                      ${e.purpose_category || ''}
+                      ${e.purpose_subtype ? '(' + e.purpose_subtype + ')' : ''}
+                  </div>
+              </div>
             </div>
 
-            <div class="ms-3 text-end">
-                <div style="font-size:0.9rem; color:#444;">${e.entry_type || '-'}</div>
-                <div style="font-size:0.8rem; color:#777;">
-                    ${e.purpose_category || ''}
-                    ${e.purpose_subtype ? '(' + e.purpose_subtype + ')' : ''}
-                </div>
-            </div>
-          </div>
+            <div id="${collapseId}" class="collapse">
+              <div class="card-body">
 
-          <div id="${collapseId}" class="collapse">
-            <div class="card-body">
+                <div><strong>Type:</strong> ${e.entry_type || '-'}</div>
+                <div><strong>Purpose:</strong> ${e.purpose_category || '-'}
+                  ${e.purpose_subtype ? '(' + e.purpose_subtype + ')' : ''}</div>
+                <div><strong>Flat:</strong> ${e.flat_no || '-'}</div>
+                <div><strong>Owner Contact:</strong> ${e.owner_contact || "Not Available"}</div>
+                <div><strong>Owner Parking Slot:</strong> ${e.parking_slot || "-"}</div>
 
-              <div><strong>Type:</strong> ${e.entry_type || '-'}</div>
-              <div><strong>Purpose:</strong> ${e.purpose_category || '-'}
-                ${e.purpose_subtype ? '(' + e.purpose_subtype + ')' : ''}</div>
-              <div><strong>Flat:</strong> ${e.flat_no || '-'}</div>
-
-
-              <!-- VEHICLE FULL PLATE OR PERSON NAME -->
                 ${
                   e.entry_type === 'Vehicle'
                   ? `<div><strong>Vehicle No:</strong> ${e.full_plate || e.last4 || '-'}</div>`
                   : `<div><strong>Name:</strong> ${e.name || '-'}</div>`
                 }
 
-                <!-- CONTACT NUMBER + DIAL BUTTON -->
+                <!-- VISITOR CONTACT WITH DIALER (KEEP THIS EXACTLY) -->
                 ${
-                  e.owner_contact
+                  e.visitor_contact
                     ? `<div><strong>Visitor Contact:</strong>
-                         <a href="tel:${e.owner_contact}"
+                         <a href="tel:${e.visitor_contact}"
                             style="text-decoration:none; font-weight:bold;">
-                            ${e.owner_contact} 📞
+                            ${e.visitor_contact} 📞
                          </a>
                        </div>`
                     : ''
                 }
 
+                ${imgs.length > 0 ? `
+                  <div class="mt-2">
+                    <strong>Image:</strong><br>
+                    <img src="${imgs[0]}"
+                       class="entry-thumb"
+                       data-img="${imgs[0]}"
+                       style="width:80px; height:80px; object-fit:cover; border-radius:6px; cursor:pointer;">
+                  </div>
+                ` : ''}
 
-              ${imgs.length > 0 ? `
-                <div class="mt-2">
-                  <strong>Image:</strong><br>
-                  <img src="${imgs[0]}"
-                     class="entry-thumb"
-                     data-img="${imgs[0]}"
-                     style="width:80px; height:80px; object-fit:cover; border-radius:6px; cursor:pointer;">
-                </div>
-              ` : ''}
-
+              </div>
             </div>
-          </div>
-        `;
+          `;
 
-        container.appendChild(card);
-      });
+          container.appendChild(card);
+        });
 
-    } catch (err) {
-      console.error("Load entries error:", err);
+      } catch (err) {
+        console.error("Load entries error:", err);
+      }
     }
-  }
+
+
 
   loadTodaysEntries();
 
@@ -464,3 +608,4 @@
 
 
 })();
+}

@@ -1895,17 +1895,49 @@ def api_todays_entries():
         conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
+        # cur.execute("""
+        #     SELECT *
+        #     FROM watchman_entries
+        #     WHERE created_at::date = (now() AT TIME ZONE 'Asia/Kolkata')::date
+        #     ORDER BY created_at DESC;
+        # """)
+
         cur.execute("""
-            SELECT *
-            FROM watchman_entries
-            WHERE created_at::date = (now() AT TIME ZONE 'Asia/Kolkata')::date
-            ORDER BY created_at DESC;
+            SELECT 
+                w.*, 
+                p."OwnerContact" AS owner_contact_lookup,
+                p."ParkingSlot" AS parking_slot_lookup
+            FROM watchman_entries w
+            LEFT JOIN parking_data p
+              ON REPLACE(REPLACE(UPPER(p."FlatNo"), '-', ''), ' ', '') =
+                 REPLACE(REPLACE(UPPER(w.flat_no), '-', ''), ' ', '')
+            WHERE w.created_at::date = (now() AT TIME ZONE 'Asia/Kolkata')::date
+            ORDER BY w.created_at DESC;
         """)
 
         rows = cur.fetchall()
         conn.close()
 
-        return jsonify([dict(r) for r in rows])
+        out = []
+        for r in rows:
+            d = dict(r)
+            # Prefer lookup values if they exist
+            # d['owner_contact'] = r.get('owner_contact_lookup') or r.get('owner_contact')
+            # d['parking_slot'] = r.get('parking_slot_lookup') or "-"
+            # Correct owner contact (from parking_data)
+            d['owner_contact'] = r.get('owner_contact_lookup')
+
+            # Correct visitor contact (stored in watchman_entries)
+            d['visitor_contact'] = r.get('owner_contact')
+
+            # Correct parking slot
+            d['parking_slot'] = r.get('parking_slot_lookup') or "-"
+
+            out.append(d)
+
+        return jsonify(out)
+
+        # return jsonify([dict(r) for r in rows])
 
     except Exception as e:
         print("❌ todays_entries error:", e)
@@ -2088,6 +2120,128 @@ def watchman_observe():
         import traceback; traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+
+def normalize_flat(flat: str) -> str:
+    """
+    Normalize flat numbers: remove spaces and dashes, uppercase.
+    e.g. 'Vista-3005' -> 'VISTA3005'
+    """
+    if not flat:
+        return ''
+    f = flat.replace(' ', '').replace('-', '')
+    return f.upper()
+
+
+# def find_parking_by_flat(flat_input):
+#     """
+#     Look up latest parking_data row for given flat (case/format insensitive).
+#     Returns a dict or None.
+#     """
+#     norm = normalize_flat(flat_input)
+#
+#     try:
+#         conn = get_connection()
+#         cur = conn.cursor()
+#
+#         # Assume parking_data has FlatNo, ParkingSlot, OwnerContact, created_at or id
+#         # We normalize FlatNo similarly in SQL for comparison
+#         query = """
+#             SELECT
+#                 "FlatNo",
+#                 "ParkingSlot",
+#                 "OwnerContact",
+#                 id
+#             FROM parking_data
+#             WHERE UPPER(REPLACE(REPLACE("FlatNo", ' ', ''), '-', '')) = %s
+#             LIMIT 1;
+#         """
+#         cur.execute(query, (norm,))
+#         row = cur.fetchone()
+#         cur.close()
+#         conn.close()
+#
+#         if not row:
+#             return None
+#
+#         flat_no, parking_slot, owner_contact, _id = row
+#
+#         return {
+#             "FlatNo": flat_no,
+#             "FlatNo_norm": norm,
+#             "ParkingSlot": parking_slot,
+#             "OwnerContact": owner_contact,
+#             # "created_at": created_at,
+#             "id": _id
+#         }
+#     except Exception as e:
+#         print("⚠️ find_parking_by_flat failed:", e)
+#         return None
+
+
+# @app.route('/api/owner_info')
+# def api_owner_info():
+#     """
+#     Given a Flat identifier (e.g. Vista-3005 / VISTA3005 / vista 3005),
+#     normalize it and fetch latest row from parking_data.
+#     Returns { found: bool, owner_contact, parking_slot, flat_normalized }.
+#     """
+#     flat = request.args.get('flat', '').strip()
+#     if not flat:
+#         return jsonify({"found": False}), 200
+#
+#     try:
+#         row = find_parking_by_flat(flat)
+#         if not row:
+#             return jsonify({"found": False}), 200
+#
+#         return jsonify({
+#             "found": True,
+#             "flat_normalized": row.get('FlatNo_norm') or row.get('FlatNo') or '',
+#             "owner_contact": row.get('OwnerContact') or '',
+#             "parking_slot": row.get('ParkingSlot') or ''
+#         })
+#     except Exception as e:
+#         print("⚠️ api_owner_info failed:", e)
+#         return jsonify({"found": False}), 200
+
+
+@app.route('/api/owner_info')
+def api_owner_info():
+    raw_flat = request.args.get("flat", "")
+    from db_utils import find_parking_by_flat_normalized
+
+    info = find_parking_by_flat_normalized(raw_flat)
+
+    if not info:
+        return jsonify({
+            "status": "ok",
+            "found": False,
+            "owner_contact": None,
+            "parking_slot": None,
+            "normalized_flat": raw_flat
+        })
+
+    return jsonify({
+        "status": "ok",
+        "found": True,
+        "owner_contact": info["OwnerContact"],
+        "parking_slot": info["ParkingSlot"],
+        "normalized_flat": info["FlatNo"]
+    })
+
+
+@app.route('/whatsapp_redirect')
+def whatsapp_redirect():
+    phone = request.args.get('phone')
+    message = request.args.get('msg', '')
+
+    # Encode properly
+    import urllib.parse
+    encoded = urllib.parse.quote(message)
+
+    # Redirect to WhatsApp
+    return redirect(f"https://wa.me/{phone}?text={encoded}")
 
 
 # ---------------------- MAIN ---------------------- #
