@@ -233,6 +233,10 @@ window.__dailyEntryInit = true;
 
 
   document.getElementById('fetchOwnerBtn').addEventListener('click', async () => {
+        document.getElementById("flatToVisit").value =
+            document.getElementById("tower_flatToVisit").value + "-" +
+            document.getElementById("flatNumber_flatToVisit").value.trim();
+
         const flat = flatToVisit.value.trim();
         const info = await fetchOwnerInfo(flat);
 
@@ -248,6 +252,10 @@ window.__dailyEntryInit = true;
 
 
     document.getElementById('fetchOwnerBtnPerson').addEventListener('click', async () => {
+        document.getElementById("personFlatToVisit").value =
+            document.getElementById("tower_personFlatToVisit").value + "-" +
+            document.getElementById("flatNumber_personFlatToVisit").value.trim();
+
         const flat = personFlatToVisit.value.trim();
         const info = await fetchOwnerInfo(flat);
 

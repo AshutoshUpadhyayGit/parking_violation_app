@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Society Access</title>
+
+  <!-- --------------- Paste this CSS into the head --------------- -->
+  <style>
+    :root{
+      --card-w: 420px;
+      --accent: #2ecc71;
+      --muted: #6b7785;
+      --bg1: #071028;
+      --bg2: #062033;
+    }
+
+    html,body{height:100%; margin:0; font-family: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, Arial;}
+    body{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:
+        radial-gradient(800px 480px at 10% 20%, rgba(18,120,135,0.06), transparent 8%),
+        linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
+      -webkit-font-smoothing:antialiased;
+      color:#e6eef6;
+    }
+
+    .login-card{
+      width:var(--card-w);
+      padding:34px;
+      border-radius:16px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+      box-shadow: 0 18px 50px rgba(2,10,20,0.6);
+      border: 1px solid rgba(255,255,255,0.03);
+      text-align:center;
+    }
+
+    /* HERO LOGO */
+    .hero-logo{
+      width:120px;
+      height:auto;
+      display:inline-block;
+      margin-bottom:12px;
+      filter: drop-shadow(0 10px 30px rgba(0,0,0,0.6));
+      border-radius:14px;
+      overflow:hidden;
+      background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.02), transparent 20%);
+      animation: breathe 6s ease-in-out infinite;
+    }
+    @keyframes breathe{
+      0%{ transform: translateY(0) scale(1); }
+      50%{ transform: translateY(-3px) scale(1.02); }
+      100%{ transform: translateY(0) scale(1); }
+    }
+
+    .title{ font-size:20px; font-weight:700; margin:6px 0 2px; color:#f5fbff; }
+    .subtitle{ font-size:13px; color:var(--muted); margin-bottom:20px; }
+
+    .form-row{ margin-top:8px; display:flex; gap:8px; align-items:center; justify-content:center; flex-direction:column; }
+
+    input[type="text"]{
+      width:100%;
+      padding:12px 14px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.02);
+      color: #e9f5ff;
+      font-size:15px;
+      outline:none;
+      transition: box-shadow .18s, border-color .18s, transform .12s;
+    }
+    input[type="text"]:focus{
+      border-color: rgba(77,139,254,0.9);
+      box-shadow: 0 6px 18px rgba(77,139,254,0.12);
+      transform: translateY(-1px);
+    }
+
+    .btn{
+      margin-top:14px;
+      appearance:none;
+      border: none;
+      width:100%;
+      padding:12px;
+      border-radius:10px;
+      background: linear-gradient(90deg,#f6b93b, #f2c94c);
+      color:#071028;
+      font-weight:700;
+      font-size:15px;
+      cursor:pointer;
+      box-shadow: 0 8px 26px rgba(246,185,59,0.18);
+    }
+    .btn:active{ transform: translateY(1px); }
+    .small-note{ font-size:12px; color:rgba(235,245,255,0.64); margin-top:12px; }
+
+  /* Digital Door Overlay */
+    .door-overlay {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      display: none;   /* Initially hidden */
+      z-index: 9999;
+      overflow: hidden;
+    }
+
+    .door {
+      position: absolute;
+      top: 0;
+      width: 50%;
+      height: 100%;
+      background: linear-gradient(180deg, #0a1728, #04101f 60%, #000);
+      box-shadow: inset 0 0 60px rgba(0, 255, 200, 0.08);
+      transition: transform 0.7s ease-in-out;
+    }
+
+    .left-door {
+      left: 0;
+      transform: translateX(0);
+    }
+    .right-door {
+      right: 0;
+      transform: translateX(0);
+    }
+
+    /* When activated, doors slide out */
+    .door-open .left-door {
+      transform: translateX(-100%);
+    }
+    .door-open .right-door {
+      transform: translateX(100%);
+    }
+
+    /* FULLSCREEN DOOR OVERLAY */
+    .door-overlay {
+        position: fixed;
+        inset: 0;
+        background: #000;
+        display: none;
+        z-index: 99999;
+        overflow: hidden;
+    }
+
+    .door {
+        position: absolute;
+        top: 0;
+        width: 50%;
+        height: 100%;
+        background: linear-gradient(145deg, #0a1a2f, #000);
+        transition: transform 0.7s ease-in-out;
+    }
+
+    /* Left panel */
+    .door-left {
+        left: 0;
+        transform: translateX(0);
+    }
+
+    /* Right panel */
+    .door-right {
+        right: 0;
+        transform: translateX(0);
+    }
+
+    /* When animation starts */
+    .door-open .door-left {
+        transform: translateX(-100%);
+    }
+    .door-open .door-right {
+        transform: translateX(100%);
+    }
+
+    /* --- FULLSCREEN GATE OVERLAY --- */
+    .gate-overlay {
+        position: fixed;
+        inset: 0;
+        display: none;
+        background: radial-gradient(circle at center, rgba(0,0,0,0.85), black 90%);
+        z-index: 99999;
+        overflow: hidden;
+    }
+
+    /* --- Gates --- */
+    .gate {
+        position: absolute;
+        top: 0;
+        width: 50%;
+        height: 100%;
+        background: linear-gradient(135deg, #091726, #02070c 60%, #000);
+        box-shadow:
+            inset 0 0 100px rgba(0,255,255,0.18),
+            inset 0 0 40px rgba(0,255,150,0.15);
+        backdrop-filter: blur(4px);
+        transition: transform 1s ease-in-out;
+    }
+
+    .left-gate  { left: 0; transform: translateX(0); }
+    .right-gate { right: 0; transform: translateX(0); }
+
+    /* --- Gates Opening Animation --- */
+    .gate-open .left-gate {
+        transform: translateX(-100%);
+    }
+
+    .gate-open .right-gate {
+        transform: translateX(100%);
+    }
+
+    /* --- Central Logo Reveal --- */
+    .gate-logo {
+        position: absolute;
+        width: 130px;
+        height: auto;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(0.6);
+        opacity: 0;
+        filter: drop-shadow(0 0 12px rgba(0,255,190,0.6));
+        transition: opacity 0.6s ease-in-out 0.3s,
+                    transform 0.6s ease-in-out 0.3s;
+    }
+
+    /* When animation triggers */
+    .gate-open #gateLogo {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+
+
+  </style>
+  <!-- --------------- end CSS --------------- -->
+
+</head>
+<body>
+  <div class="login-card">
+
+    <!-- HERO: use the image you saved at static/images/logo-hero.png -->
+
+
+<!--    <div class="title">{{ session.get('society_name', 'Society Access') }}</div>-->
+<!--    <div class="subtitle">Enter your society access code to continue</div>-->
+
+    <!-- Brand Title -->
+    <h2 style="
+        font-size: 30px;
+        font-weight: 800;
+        color: #ffffff;
+        margin-bottom: 4px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        text-align: center;">
+        D-PASS
+    </h2>
+
+    <!-- Tagline -->
+    <p style="
+        font-size: 14px;
+        color: #b7c3d1;
+        margin-top: -4px;
+        margin-bottom: 18px;
+        text-align: center;">
+        Digital Parking & Access Security Services
+    </p>
+
+    <div>
+      <img class="hero-logo"
+         src="https://rkjebswwcflbxwotoocu.supabase.co/storage/v1/object/sign/QR_Image/logo_hero.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9mNjY2NDMyZC1hMzllLTQ4MGItODgxZS0zZDU0Yjg0ZDg5YzMiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJRUl9JbWFnZS9sb2dvX2hlcm8ucG5nIiwiaWF0IjoxNzY1NDU0NjQyLCJleHAiOjIzOTYxNzQ2NDJ9.O2xDucqQZNT7EN-ymDClb1Ah1ywmDYrkxf1ue9XkAZU"
+         alt="{{ session.get('society_name','Gate Management') }} logo" />
+    </div>
+
+    <!-- Society Name (dynamic) -->
+    <div class="title" style="color:white; font-weight:600; margin-top:10px;">
+        {{ session.get('society_name', 'Society Access') }}
+    </div>
+
+    <!-- Subtitle -->
+    <div class="subtitle" style="color:#9aa7b8;">
+        Enter your society access code to continue
+    </div>
+
+
+    <!-- IMPORTANT: exact form (uses your existing /society_login route and field name) -->
+    <form action="{{ url_for('society_login') }}" method="POST" autocomplete="off">
+      <div class="form-row">
+        <input id="soc_unique_id" name="soc_unique_id" type="text" placeholder="Enter access code" required />
+        <button class="btn" type="submit">Continue</button>
+      </div>
+    </form>
+
+    <div class="small-note">Don’t have a code? Contact your society administrator.</div>
+  </div>
+
+  <!-- small script: autofocus input for faster flow -->
+  <script>
+    (function(){ var e = document.getElementById('soc_unique_id'); if(e) { e.focus(); e.select(); } })();
+  </script>
+
+  <!-- Digital Door Animation Overlay -->
+    <div id="doorAnimation" class="door-overlay">
+      <div class="door left-door"></div>
+      <div class="door right-door"></div>
+    </div>
+
+    <script>
+    document.querySelector("form").addEventListener("submit", function() {
+        // Show overlay
+        const overlay = document.getElementById("doorAnimation");
+        overlay.style.display = "block";
+
+        // Trigger animation
+        setTimeout(() => {
+            overlay.classList.add("door-open");
+        }, 50);  // slight delay for smoothness
+    });
+    </script>
+
+    <!-- DIGITAL DOOR ANIMATION -->
+    <div id="doorOverlay" class="door-overlay">
+        <div class="door door-left"></div>
+        <div class="door door-right"></div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+
+            const form = document.querySelector("form");  // your only form on this page
+            const overlay = document.getElementById("doorOverlay");
+
+            form.addEventListener("submit", function (event) {
+
+                // Show overlay
+                overlay.style.display = "block";
+
+                // Start animation
+                setTimeout(() => {
+                    overlay.classList.add("door-open");
+                }, 20);
+
+                // Delay form actual submission so animation is visible
+                event.preventDefault();  // temporarily stop immediate submit
+
+                setTimeout(() => {
+                    form.submit();  // now truly submit form after animation
+                }, 600); // adjust this for slower/faster animation
+            });
+        });
+    </script>
+
+    <!-- PREMIUM DIGITAL GATE ANIMATION -->
+    <div id="gateOverlay" class="gate-overlay">
+
+      <!-- Left Gate -->
+      <div class="gate left-gate"></div>
+
+      <!-- Right Gate -->
+      <div class="gate right-gate"></div>
+
+      <!-- Glowing Logo Reveal -->
+      <img id="gateLogo" class="gate-logo"
+           src="https://rkjebswwcflbxwotoocu.supabase.co/storage/v1/object/sign/QR_Image/logo_hero.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9mNjY2NDMyZC1hMzllLTQ4MGItODgxZS0zZDU0Yjg0ZDg5YzMiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJRUl9JbWFnZS9sb2dvX2hlcm8ucG5nIiwiaWF0IjoxNzY1NDU0NjQyLCJleHAiOjIzOTYxNzQ2NDJ9.O2xDucqQZNT7EN-ymDClb1Ah1ywmDYrkxf1ue9XkAZU"
+           alt="Gate Logo">
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+
+            const form = document.querySelector("form");
+            const overlay = document.getElementById("gateOverlay");
+
+            form.addEventListener("submit", function (event) {
+
+                // Prevent instant redirect
+                event.preventDefault();
+
+                // Show overlay
+                overlay.style.display = "block";
+
+                // Trigger gates opening + logo reveal
+                setTimeout(() => {
+                    overlay.classList.add("gate-open");
+                }, 30);
+
+                // Delay redirect until animation completes
+                setTimeout(() => {
+                    form.submit();
+                }, 1200);
+            });
+
+        });
+    </script>
+
+
+
+</body>
+</html>

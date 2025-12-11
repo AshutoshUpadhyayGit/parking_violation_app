@@ -1,6 +1,15 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 
 from threading import Lock
+from functools import wraps
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('logged_in'):
+            return redirect('/society_auth')
+        return f(*args, **kwargs)
+    return decorated
 
 from db_utils import *
 app = Flask(__name__)
@@ -10,6 +19,12 @@ DATA_FILE = 'parking_data.xlsx'
 VIOLATION_FILE = 'violations.xlsx'
 
 excel_lock = Lock()  # Prevent Excel write conflicts
+
+@app.context_processor
+def inject_society_name():
+    return {
+        "society_name": session.get("society_name", "")
+    }
 
 # ---------------------- SAFE EXCEL WRITE ---------------------- #
 import tempfile
@@ -44,6 +59,7 @@ def safe_write_excel(df, path):
 # ---------------------- HOME ---------------------- #
 @app.route('/')
 @app.route('/home')
+@login_required
 def index():
     return render_template('index.html')
 
@@ -51,18 +67,52 @@ def index():
 
 # ---------------------- ADMIN LOGIN ---------------------- #
 @app.route('/admin_login', methods=['GET', 'POST'])
+@login_required
 def admin_login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
 
-        if username in ["tenxhabitat_societyadmin", "tenxhabitat_securityadmin"] and password == "tenx_parking_secure":
+        # if username in ["tenxhabitat_societyadmin", "tenxhabitat_securityadmin"] and password == "tenx_parking_secure":
+        #     session['admin_logged_in'] = True
+        #     session['admin_user'] = username
+        #     flash('Login successful', 'success')
+        #     return redirect(url_for('admin_dashboard'))
+        # else:
+        #     flash('Invalid credentials', 'danger')
+
+        # Ensure society login happened first
+        society_id = session.get("society_id")
+        if not society_id:
+            flash("Please login with society code before admin login.", "danger")
+            return redirect(url_for('society_auth'))
+
+        # Fetch admin credentials for THIS society
+        try:
+            with engine.connect() as conn:
+                row = conn.execute(text("""
+                    SELECT admin_username, admin_password
+                    FROM societies_onboard
+                    WHERE id = :sid
+                """), {"sid": society_id}).mappings().first()
+        except Exception as e:
+            print("Admin login DB error:", e)
+            flash("Internal server error", "danger")
+            return render_template("admin_login.html")
+
+        if not row:
+            flash("Admin credentials not set for this society.", "danger")
+            return render_template("admin_login.html")
+
+        # Validate admin username + password
+        if username == row["admin_username"] and password == row["admin_password"]:
             session['admin_logged_in'] = True
             session['admin_user'] = username
-            flash('Login successful', 'success')
-            return redirect(url_for('admin_dashboard'))
+            flash("Login successful", "success")
+            return redirect(url_for("admin_dashboard"))
         else:
-            flash('Invalid credentials', 'danger')
+            flash("Invalid admin credentials", "danger")
+
     return render_template('admin_login.html')
 
 
@@ -71,150 +121,6 @@ def logout():
     session.clear()
     flash('Logged out successfully', 'info')
     return redirect(url_for('index'))
-
-
-# ---------------------- HOME ---------------------- #
-# @app.route('/')
-# @app.route('/home')
-# def index():
-#     return render_template('index.html')
-
-
-
-
-############# CURRENTLY USED UPLOAD FUNC ##################
-# @app.route('/upload', methods=['POST'])
-# def upload():
-#     try:
-#         parking_slot = request.form.get('parking_slot', '').strip().upper()
-#         entered_digits = request.form.get('last4', '').strip()
-#
-#         uploaded_files = request.files.getlist('image')
-#         image_paths = []
-#
-#         # ✅ Upload to Supabase (also local copy)
-#         if uploaded_files:
-#             image_paths = upload_images_to_supabase(uploaded_files, save_local=True)
-#
-#         image_path = ','.join(image_paths) if image_paths else None
-#
-#         if not parking_slot:
-#             return render_template('index.html', message="⚠️ Please provide your parking slot.")
-#         if not entered_digits and not image_paths:
-#             return render_template('index.html', message="⚠️ Please provide either last 4 digits or upload at least one image.")
-#
-#         if not os.path.exists(DATA_FILE):
-#             return render_template('index.html', message="🚨 Registry file missing. Please contact admin.")
-#
-#         reg = pd.read_excel(DATA_FILE, dtype=str)
-#         reg['Last4'] = reg['VehicleNo'].astype(str).str[-4:]
-#
-#         match = reg[reg['Last4'].str.upper() == entered_digits.upper()] if entered_digits else pd.DataFrame()
-#
-#         # --- Unregistered Vehicle ---
-#         if match.empty:
-#             record = {
-#                 'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-#                 'detected_number': f'Unknown-{entered_digits}',
-#                 'parked_slot': parking_slot,
-#                 'allotted_slot': 'N/A',
-#                 'fine': 1000,
-#                 'image_path': image_path,
-#                 'Status': 'Pending',
-#                 'Owner': 'UNKNOWN',
-#                 'FlatNo': 'UNKNOWN'
-#             }
-#
-#             with excel_lock:
-#                 if os.path.exists(VIOLATION_FILE):
-#                     existing = pd.read_excel(VIOLATION_FILE)
-#                     updated = pd.concat([existing, pd.DataFrame([record])], ignore_index=True)
-#                 else:
-#                     updated = pd.DataFrame([record])
-#                 updated.to_excel(VIOLATION_FILE, index=False)
-#
-#             log_violation(record)
-#
-#             result = {
-#                 'status': 'Pending',
-#                 'fine': 1000,
-#                 'image_path': image_path,
-#                 'vehicle_no': f'Unknown-{entered_digits}',
-#                 'owner': 'UNKNOWN',
-#                 'flat': 'UNKNOWN',
-#                 'allotted_slot': 'N/A',
-#                 'parked_slot': parking_slot,
-#                 'timestamp': record['timestamp']
-#             }
-#             return render_template('index.html', message="🚨 Vehicle Not Registered — Logged for Admin Verification.", result=result)
-#
-#         # --- Registered Vehicle ---
-#         vehicle_info = match.iloc[0]
-#         print("vehicle_info : ------>\n", vehicle_info)
-#         vehicle_no = vehicle_info['VehicleNo']
-#         owner = vehicle_info['OwnerName']
-#         flat = vehicle_info['FlatNo']
-#         allotted_slot = str(vehicle_info['ParkingSlot']).strip().upper()
-#         vehicle_type = str(vehicle_info['VehicleType']).lower()
-#         OwnerContact = vehicle_info['OwnerContact']
-#
-#         if allotted_slot != parking_slot:
-#             fine = 100 if 'bike' in vehicle_type else 500
-#             past_count = 0
-#             if os.path.exists(VIOLATION_FILE):
-#                 past = pd.read_excel(VIOLATION_FILE, dtype=str)
-#                 past_count = len(past[past['detected_number'] == vehicle_no])
-#                 if past_count > 3:
-#                     fine = 5000
-#             message = f"❌ VIOLATION DETECTED!\n\n{vehicle_no} ({owner}, Flat {flat}) parked in {parking_slot} instead of {allotted_slot}. Fine ₹{fine}."
-#             status = "Pending"
-#         else:
-#             message = f"✅ No violation — Vehicle {vehicle_no} is correctly parked in {parking_slot}."
-#             fine = 0
-#             status = "OK"
-#
-#         record = {
-#             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-#             'detected_number': vehicle_no,
-#             'parked_slot': parking_slot,
-#             'allotted_slot': allotted_slot,
-#             'fine': fine,
-#             'image_path': image_path,
-#             'Status': status,
-#             'Owner': owner,
-#             'FlatNo': flat,
-#             'OwnerContact':OwnerContact
-#         }
-#
-#         with excel_lock:
-#             if os.path.exists(VIOLATION_FILE):
-#                 existing = pd.read_excel(VIOLATION_FILE)
-#                 updated = pd.concat([existing, pd.DataFrame([record])], ignore_index=True)
-#             else:
-#                 updated = pd.DataFrame([record])
-#             updated.to_excel(VIOLATION_FILE, index=False)
-#
-#         log_violation(record)
-#
-#         result = {
-#             'status': status,
-#             'fine': fine,
-#             'image_path': image_path,
-#             'vehicle_no': vehicle_no,
-#             'owner': owner,
-#             'flat': flat,
-#             'allotted_slot': allotted_slot,
-#             'parked_slot': parking_slot,
-#             'timestamp': record['timestamp'],
-#             'OwnerContact': OwnerContact
-#         }
-#         print(">>> Upload result sent:", result)
-#         return render_template('index.html', message=message, result=result)
-#
-#     except Exception as e:
-#         return render_template('index.html', message=f"⚠️ Error: {e}")
-
-
 
 
 @app.route('/upload', methods=['POST'])
@@ -395,31 +301,10 @@ def upload():
         return render_template('index.html', message=f"⚠️ Error: {e}")
 
 
-# ---------------------- ADMIN LOGIN ---------------------- #
-# @app.route('/admin_login', methods=['GET', 'POST'])
-# def admin_login():
-#     if request.method == 'POST':
-#         username = request.form.get('username', '').strip()
-#         password = request.form.get('password', '').strip()
-#
-#         if username in ["tenxhabitat_societyadmin", "tenxhabitat_securityadmin"] and password == "tenx_parking_secure":
-#             session['admin_logged_in'] = True
-#             session['admin_user'] = username
-#             flash('Login successful', 'success')
-#             return redirect(url_for('admin_dashboard'))
-#         else:
-#             flash('Invalid credentials', 'danger')
-#     return render_template('admin_login.html')
-
-
-# @app.route('/logout')
-# def logout():
-#     session.clear()
-#     flash('Logged out successfully', 'info')
-#     return redirect(url_for('index'))
 
 # ---------------------- ADMIN DASHBOARD (DB-FIRST) ---------------------- #
 @app.route('/admin_dashboard')
+@login_required
 def admin_dashboard():
     if 'admin_user' not in session:
         flash('Please log in to access admin dashboard.', 'danger')
@@ -428,27 +313,53 @@ def admin_dashboard():
     try:
         # Try fetching directly from Supabase (Postgres)
         with engine.connect() as conn:
-            df = pd.read_sql(
-                text("""
-                    SELECT
-                        "id",                       -- ✅ primary key included
-                        "timestamp",
-                        "detected_number",
-                        "parked_slot",
-                        "allotted_slot",
-                        "fine",
-                        "image_path",
-                        "Status",
-                        "Owner",
-                        "FlatNo",
-                        COALESCE("VerifiedBy", '') AS "VerifiedBy",
-                        COALESCE("VerifiedAt", NULL::timestamptz) AS "VerifiedAt",
-                        COALESCE("OwnerContact", 'N/A') AS "OwnerContact"
-                    FROM violations
-                    ORDER BY "timestamp" DESC;
-                """),
-                conn
-            )
+            # df = pd.read_sql(
+            #     text("""
+            #         SELECT
+            #             "id",                       -- ✅ primary key included
+            #             "timestamp",
+            #             "detected_number",
+            #             "parked_slot",
+            #             "allotted_slot",
+            #             "fine",
+            #             "image_path",
+            #             "Status",
+            #             "Owner",
+            #             "FlatNo",
+            #             COALESCE("VerifiedBy", '') AS "VerifiedBy",
+            #             COALESCE("VerifiedAt", NULL::timestamptz) AS "VerifiedAt",
+            #             COALESCE("OwnerContact", 'N/A') AS "OwnerContact"
+            #         FROM violations
+            #         ORDER BY "timestamp" DESC;
+            #     """),
+            #     conn
+            # )
+            from db_utils import apply_society_filter  # ensure imported once at top
+
+            base_query = """
+            SELECT
+                "id",
+                "timestamp",
+                "detected_number",
+                "parked_slot",
+                "allotted_slot",
+                "fine",
+                "image_path",
+                "Status",
+                "Owner",
+                "FlatNo",
+                COALESCE("VerifiedBy", '') AS "VerifiedBy",
+                COALESCE("VerifiedAt", NULL::timestamptz) AS "VerifiedAt",
+                COALESCE("OwnerContact", 'N/A') AS "OwnerContact"
+            FROM violations
+            """
+
+            base_query = apply_society_filter(base_query)
+
+            query = base_query + ' ORDER BY "timestamp" DESC'
+
+            df = pd.read_sql(text(query), conn)
+
         print(f"✅ Loaded {len(df)} violations from Supabase DB")
         print("COLUMNS →", df.columns.tolist())
         print(df.head(5).to_dict(orient='records'))
@@ -531,6 +442,7 @@ def admin_dashboard():
 # ---------------------- VERIFY / DISMISS ---------------------- #
 # ---------------------- VERIFY / DISMISS ---------------------- #
 @app.route('/verify/<int:id>', methods=['POST'])
+@login_required
 def verify(id):
     """Mark a violation as Verified using the DB primary key `id`."""
     if 'admin_logged_in' not in session:
@@ -759,6 +671,7 @@ from flask import abort, send_file, make_response  # already probably present
 
 # ---------- NEW: Preview page used in WhatsApp message (short links) ----------
 @app.route('/notify/preview/<int:id>')
+@login_required
 def notify_preview(id):
     """
     Small preview page showing the violation photos and short details.
@@ -824,6 +737,7 @@ def notify_preview(id):
 
 # ---------- NEW: QR preview page ----------
 @app.route('/notify/qr/<int:id>')
+@login_required
 def notify_qr(id):
     """
     Small QR preview page. For now uses the static QR URL saved in your verifyAndNotify payload.
@@ -851,6 +765,7 @@ def notify_qr(id):
 
 # ---------- FIXED: One-click Assign / Clamp endpoint ----------
 @app.route('/assign_or_clamp', methods=['POST'])
+@login_required
 def assign_or_clamp():
     """
     Called by admin UI when user clicks Assign / Clamp on the Pending list.
@@ -1037,6 +952,13 @@ def assign_or_clamp():
         fine = 1000
         default_slot = parking_rec.get("ParkingSlot") if parking_rec else ""
 
+        # --- NEW: Normalize flat for unregistered ---
+        prefixes = session.get("allowed_prefixes", [])
+        if prefixes:
+            flatnorm = f"{prefixes[0].upper()}-UNKNOWN"
+        else:
+            flatnorm = "UNKNOWN"
+
 
         # Update DB row → UNKNOWN (FIXED)
         try:
@@ -1046,7 +968,8 @@ def assign_or_clamp():
                         UPDATE violations
                         SET "Owner" = 'UNKNOWN',
                             "OwnerContact" = 'N/A',
-                            "FlatNo" = 'UNKNOWN',
+                            
+                            "FlatNo" = :flatnorm,
                             "allotted_slot" = :slot,
                             "fine" = :fine,
                             "Status" = 'UNKNOWN',
@@ -1055,14 +978,14 @@ def assign_or_clamp():
                         WHERE RIGHT("detected_number", 4) = :last4
                           AND DATE_TRUNC('minute',"timestamp")
                               = DATE_TRUNC('minute', to_timestamp(:ts,'YYYY-MM-DD HH24:MI:SS'));
-                    """), {"slot": default_slot or 'N/A', "fine": fine, "last4": last4, "ts": ts_str,"admin": admin})
+                    """), {"flatnorm": flatnorm,"slot": default_slot or 'N/A', "fine": fine, "last4": last4, "ts": ts_str,"admin": admin})
             else:
                 with engine.begin() as conn:
                     conn.execute(text("""
                         UPDATE violations
                         SET "Owner" = 'UNKNOWN',
                             "OwnerContact" = 'N/A',
-                            "FlatNo" = 'UNKNOWN',
+                            "FlatNo" = :flatnorm,
                             "allotted_slot" = :slot,
                             "fine" = :fine,
                             "Status" = 'UNKNOWN',
@@ -1074,7 +997,7 @@ def assign_or_clamp():
                                 AND COALESCE("Status",'') NOT IN ('Verified','Dismissed','CLAMPED','UNKNOWN')
                               ORDER BY "timestamp" DESC LIMIT 1
                         );
-                    """), {"slot": default_slot or 'N/A', "fine": fine, "last4": last4,"admin": admin})
+                    """), {"flatnorm": flatnorm,"slot": default_slot or 'N/A', "fine": fine, "last4": last4,"admin": admin})
         except Exception as e:
             print("⚠️ Unregistered DB update failed:", e)
 
@@ -1113,6 +1036,7 @@ def assign_or_clamp():
 
 
 @app.route('/assign_owner', methods=['POST'])
+@login_required
 def assign_owner():
     print("📩 assign_owner() HIT!")
     print("📩 FORM DATA:", dict(request.form))
@@ -1301,6 +1225,7 @@ def assign_owner():
 
 # ---------------------- FETCH VEHICLE DETAILS (AJAX) ---------------------- #
 @app.route('/get_vehicle_details/<vehicle_no>', methods=['GET'])
+@login_required
 def get_vehicle_details(vehicle_no):
     try:
         vehicle_no = vehicle_no.strip().upper()
@@ -1348,6 +1273,7 @@ def normalize_flat(s):
 
 
 @app.route('/summary', methods=['GET', 'POST'])
+@login_required
 def summary():
     flat_no = None
     user_records = []
@@ -1410,16 +1336,22 @@ def summary():
 
 
 @app.route('/admin_dashboard/actioned')
+@login_required
 def admin_actioned():
     """Actioned / Resolved Violations — shows both Verified and Dismissed (DB-first, Excel fallback)."""
     if 'admin_user' not in session:
         flash('Please log in to access admin dashboard.', 'danger')
         return redirect(url_for('admin_login'))
 
+    if 'allowed_prefixes' not in session:
+        flash("Society filter missing — please login again")
+        return redirect(url_for('society_auth'))
+
     try:
         # ✅ Step 1: Try fetching from Supabase / DB first
         try:
             df = fetch_violations_from_db()  # your existing DB fetch helper
+            print("df in actioned table : ", df)
             print("df: ", df.columns)
             if not df.empty:
                 df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
@@ -1478,6 +1410,7 @@ def admin_actioned():
 
 
 @app.route('/admin_dashboard/clamped')
+@login_required
 def admin_clamped():
     """Unknown / Unregistered Vehicles tab (Status = 'UNKNOWN')."""
     if 'admin_user' not in session:
@@ -1486,23 +1419,51 @@ def admin_clamped():
 
     try:
         # Try DB fetch
-        query = text("""
-            SELECT 
-                id,
-                "timestamp",
-                "detected_number",
-                "parked_slot",
-                "allotted_slot",
-                "fine",
-                "image_path",
-                "Status",
-                "Owner",
-                "FlatNo"
-            FROM violations
-            WHERE "Status" = 'UNKNOWN'
-            ORDER BY "timestamp" DESC;
-        """)
-        vdf = pd.read_sql(query, engine)
+        # query = text("""
+        #     SELECT
+        #         id,
+        #         "timestamp",
+        #         "detected_number",
+        #         "parked_slot",
+        #         "allotted_slot",
+        #         "fine",
+        #         "image_path",
+        #         "Status",
+        #         "Owner",
+        #         "FlatNo"
+        #     FROM violations
+        #     WHERE "Status" = 'UNKNOWN'
+        #     ORDER BY "timestamp" DESC;
+        # """)
+        # vdf = pd.read_sql(query, engine)
+
+        from db_utils import apply_society_filter  # ensure imported once at top
+
+        base_query = """
+        SELECT 
+            id,
+            "timestamp",
+            "detected_number",
+            "parked_slot",
+            "allotted_slot",
+            "fine",
+            "image_path",
+            "Status",
+            "Owner",
+            "FlatNo"
+        FROM violations
+        WHERE "Status" = 'UNKNOWN'
+        """
+
+        base_query = apply_society_filter(base_query)
+
+        query = base_query + ' ORDER BY "timestamp" DESC'
+
+        vdf = pd.read_sql(text(query), engine)
+        print("vdf in clamped function 1417 in app.py : \n",vdf)
+
+
+
     except Exception as e:
         print("⚠️ Supabase fetch failed for UNKNOWN tab", e)
         vdf = pd.DataFrame()
@@ -1533,6 +1494,7 @@ def admin_clamped():
 # ==========================
 
 @app.route('/watchman_login', methods=['GET', 'POST'])
+@login_required
 def watchman_login():
     """Simple watchman login via PIN"""
     if request.method == 'POST':
@@ -1550,6 +1512,7 @@ def watchman_login():
 
 
 @app.route('/register_watchman', methods=['GET', 'POST'])
+@login_required
 def watchman_register():
     """Register a new watchman (only name + 3-digit pin)."""
     if request.method == 'POST':
@@ -1574,6 +1537,7 @@ from db_utils import fetch_violations_from_db
 import pytz
 
 @app.route('/watchman_dashboard')
+@login_required
 def watchman_dashboard():
     """Display today's violations + recent watchman actions."""
     if 'watchman_id' not in session:
@@ -1699,6 +1663,7 @@ from flask import jsonify
 from db_utils import find_vehicle_by_last4, log_watchman_entry
 
 @app.route('/daily_entry', methods=['GET', 'POST'])
+@login_required
 def daily_entry():
     """
     New page for watchman to record entries (Vehicle or Person).
@@ -1711,7 +1676,8 @@ def daily_entry():
 
     if request.method == 'GET':
         # Render page; watchman name is passed for auto-fill
-        return render_template('daily_entry.html', watchman=session.get('watchman_name', ''))
+        return render_template('daily_entry.html', watchman=session.get('watchman_name', ''),
+    allowed_prefixes=session.get('allowed_prefixes', []))
 
     # # POST handling: expect a JSON body (fetch from fetch/XHR)
     # try:
@@ -1885,6 +1851,7 @@ def api_find_vehicle():
 #         return jsonify([])
 
 @app.route('/api/todays_entries')
+@login_required
 def api_todays_entries():
     if 'watchman_id' not in session:
         return jsonify([])
@@ -1954,7 +1921,12 @@ def register_vehicle():
         vehicle_no = request.form.get('vehicle_no_full', '').strip().upper()
         owner_name = request.form.get('owner_name', '').strip()
         owner_contact = request.form.get('owner_contact', '').strip()
-        flat_no = request.form.get('flat_no', '').strip().upper()
+        # flat_no = request.form.get('flat_no', '').strip().upper()
+        tower = request.form.get("tower_prefix")
+        flat_number = request.form.get("flat_no")
+
+        flat_no = f"{tower}-{flat_number}".upper().replace(" ", "")
+
         vehicle_type = request.form.get('vehicle_type', '').strip()
         slot = request.form.get('slot', '').strip().upper()
 
@@ -2042,6 +2014,7 @@ def check_vehicle_exists():
 from flask import request, jsonify
 
 @app.route('/watchman_observe', methods=['POST'])
+@login_required
 def watchman_observe():
     """
     Watchman records: Verify / Dismiss / Clamp / Unknown.
@@ -2133,79 +2106,6 @@ def normalize_flat(flat: str) -> str:
     return f.upper()
 
 
-# def find_parking_by_flat(flat_input):
-#     """
-#     Look up latest parking_data row for given flat (case/format insensitive).
-#     Returns a dict or None.
-#     """
-#     norm = normalize_flat(flat_input)
-#
-#     try:
-#         conn = get_connection()
-#         cur = conn.cursor()
-#
-#         # Assume parking_data has FlatNo, ParkingSlot, OwnerContact, created_at or id
-#         # We normalize FlatNo similarly in SQL for comparison
-#         query = """
-#             SELECT
-#                 "FlatNo",
-#                 "ParkingSlot",
-#                 "OwnerContact",
-#                 id
-#             FROM parking_data
-#             WHERE UPPER(REPLACE(REPLACE("FlatNo", ' ', ''), '-', '')) = %s
-#             LIMIT 1;
-#         """
-#         cur.execute(query, (norm,))
-#         row = cur.fetchone()
-#         cur.close()
-#         conn.close()
-#
-#         if not row:
-#             return None
-#
-#         flat_no, parking_slot, owner_contact, _id = row
-#
-#         return {
-#             "FlatNo": flat_no,
-#             "FlatNo_norm": norm,
-#             "ParkingSlot": parking_slot,
-#             "OwnerContact": owner_contact,
-#             # "created_at": created_at,
-#             "id": _id
-#         }
-#     except Exception as e:
-#         print("⚠️ find_parking_by_flat failed:", e)
-#         return None
-
-
-# @app.route('/api/owner_info')
-# def api_owner_info():
-#     """
-#     Given a Flat identifier (e.g. Vista-3005 / VISTA3005 / vista 3005),
-#     normalize it and fetch latest row from parking_data.
-#     Returns { found: bool, owner_contact, parking_slot, flat_normalized }.
-#     """
-#     flat = request.args.get('flat', '').strip()
-#     if not flat:
-#         return jsonify({"found": False}), 200
-#
-#     try:
-#         row = find_parking_by_flat(flat)
-#         if not row:
-#             return jsonify({"found": False}), 200
-#
-#         return jsonify({
-#             "found": True,
-#             "flat_normalized": row.get('FlatNo_norm') or row.get('FlatNo') or '',
-#             "owner_contact": row.get('OwnerContact') or '',
-#             "parking_slot": row.get('ParkingSlot') or ''
-#         })
-#     except Exception as e:
-#         print("⚠️ api_owner_info failed:", e)
-#         return jsonify({"found": False}), 200
-
-
 @app.route('/api/owner_info')
 def api_owner_info():
     raw_flat = request.args.get("flat", "")
@@ -2232,6 +2132,7 @@ def api_owner_info():
 
 
 @app.route('/whatsapp_redirect')
+@login_required
 def whatsapp_redirect():
     phone = request.args.get('phone')
     message = request.args.get('msg', '')
@@ -2244,8 +2145,81 @@ def whatsapp_redirect():
     return redirect(f"https://wa.me/{phone}?text={encoded}")
 
 
+
+from flask import render_template, request, redirect, session, flash
+from db_utils import get_connection
+import json
+
+@app.route('/society_auth')
+def society_auth():
+    return render_template('society_login.html')
+
+
+@app.route('/society_login', methods=['POST'])
+def society_login():
+    soc_unique_id = request.form.get('soc_unique_id', '').strip().lower()
+
+    if not soc_unique_id:
+        flash("Please enter a valid access code")
+        return redirect("/society_auth")
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT id, soc_unique_id, society_name, tower_list_json, is_active
+        FROM societies_onboard
+        WHERE LOWER(soc_unique_id) = %s
+        LIMIT 1;
+    """, (soc_unique_id,))
+
+    society = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    # society is a RealDictRow or dict
+    if not society:
+        flash("Invalid access code")
+        return redirect("/society_auth")
+
+    if not society['is_active']:
+        flash("Access disabled for this society. Please contact admin.")
+        return redirect("/society_auth")
+
+    # tower_list_json is already a Python list in your case
+    towers = society.get('tower_list_json')  # ['VISTA', 'VIVA', 'CURA', 'AURA', 'VERDOR']
+
+    # Just in case some environments return it as text, handle both safely
+    if isinstance(towers, str):
+        try:
+            towers = json.loads(towers)
+        except Exception:
+            towers = []
+
+    if not isinstance(towers, list):
+        towers = []
+
+    # Store context in session
+    session['society_id'] = society['id']
+    session['society_name'] = society['society_name']
+    session['allowed_prefixes'] = towers
+    session['society_name'] = society['society_name']
+    session['logged_in'] = True
+    # print("session : ", session)
+
+    # After successful login, go to your normal landing page
+    return redirect("/")
+
+@app.route('/society_logout')
+def society_logout():
+    session.clear()  # Clears society + watchman + admin all in one go
+    return redirect('/society_auth')
+
+
 # ---------------------- MAIN ---------------------- #
 if __name__ == '__main__':
     app.run(debug=True)
+
 
 

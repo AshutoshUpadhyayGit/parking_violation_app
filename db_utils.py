@@ -30,6 +30,34 @@ def get_connection():
     """Create a direct psycopg2 connection to Supabase Postgres."""
     return psycopg2.connect(POSTGRES_CONN, cursor_factory=RealDictCursor)
 
+from flask import session
+import re
+
+def apply_society_filter(query: str) -> str:
+    prefixes = session.get('allowed_prefixes')
+    print("prefixes:", prefixes, type(prefixes))
+
+    # If society filter is not set → do not modify the query
+    if not prefixes:
+        return query
+
+    # Build OR filter conditions for FlatNo
+    conditions = []
+    for prefix in prefixes:
+        prefix_clean = prefix.strip()  # basic cleanup
+        conditions.append(f"LOWER(\"FlatNo\") LIKE LOWER('{prefix_clean}%')")
+
+    filter_sql = "(" + " OR ".join(conditions) + ")"
+
+    # Inject filter safely
+    if " WHERE " in query.upper():
+        query = f"{query.rstrip(';')} AND {filter_sql}"
+    else:
+        query = f"{query.rstrip(';')} WHERE {filter_sql}"
+
+    return query
+
+
 
 def safe_write_excel(df, file_path):
     import os
@@ -56,9 +84,12 @@ def safe_write_excel(df, file_path):
 # =========================================================
 def get_parking_registry():
     """Fetch entire parking registry as a DataFrame."""
+
     query = "SELECT * FROM parking_data"
+    query = apply_society_filter(query)
     with get_connection() as conn:
         df = pd.read_sql(query, conn)
+        print("Works OK in parking_registry 85: ", len(df))
     return df
 
 
@@ -155,6 +186,18 @@ def log_violation(record):
     """
     try:
         print("🟢 Logging violation record to Violation Table:", record)
+
+        # ⭐⭐⭐ ADD THIS BLOCK ⭐⭐⭐
+        # Normalize FlatNo for UNKNOWN cases
+        flat = record.get("FlatNo", "")
+        if not flat or flat.strip().upper() == "UNKNOWN":
+            prefixes = session.get("allowed_prefixes", [])
+            if prefixes:
+
+                flat_insert_value = f"{prefixes[0].upper()}-UNKNOWN"
+                print("FlatNo rewritten to:", flat_insert_value)
+        # ⭐⭐⭐ END OF NEW BLOCK ⭐⭐⭐
+
         conn = get_connection()
         cur = conn.cursor()
         cur.execute('''
@@ -172,7 +215,7 @@ def log_violation(record):
             record.get("image_path"),
             record.get("Status"),
             record.get("Owner"),
-            record.get("FlatNo"),
+            flat_insert_value,
             record.get("OwnerContact")
         ))
         conn.commit()
@@ -182,16 +225,17 @@ def log_violation(record):
         return True
     except Exception as e:
         print("❌ Supabase insert error:", e)
-        try:
-            import pandas as pd, os
-            df = pd.DataFrame([record])
-            if os.path.exists("violations.xlsx"):
-                old = pd.read_excel("violations.xlsx")
-                df = pd.concat([old, df], ignore_index=True)
-            df.to_excel("violations.xlsx", index=False)
-            print("✅ Excel fallback saved")
-        except Exception as ex:
-            print("⚠️ Excel fallback failed:", ex)
+        # try:
+        #     # import pandas as pd, os
+        #     # df = pd.DataFrame([record])
+        #     # if os.path.exists("violations.xlsx"):
+        #     #     old = pd.read_excel("violations.xlsx")
+        #     #     df = pd.concat([old, df], ignore_index=True)
+        #     # df.to_excel("violations.xlsx", index=False)
+        #     # print("✅ Excel fallback saved")
+        #     p
+        # except Exception as ex:
+        #     print("⚠️ Excel fallback failed:", ex)
         return False
 
 
@@ -200,8 +244,38 @@ import pandas as pd
 def fetch_violations_from_db():
     """Fetch all violations from Supabase database with fallback to Excel."""
     try:
-        query = 'SELECT * FROM violations ORDER BY "timestamp" DESC;'
-        df = pd.read_sql(query, engine)
+        # 1) Base SELECT without ORDER BY
+        # base_query = 'SELECT * FROM violations'
+        #
+        # # 2) Apply society filter to base SELECT
+        # base_query = apply_society_filter(base_query)
+        #
+        # # 3) Add ORDER BY after filtering
+        # query = base_query + ' ORDER BY "timestamp" DESC'
+        #
+        # print("query : ", query)
+        prefixes = session.get('allowed_prefixes')
+        print("prefixes  :", prefixes)
+        print(type(prefixes))
+
+        conditions = []
+        for prefix in prefixes:
+            conditions.append(f"LOWER(\"FlatNo\") LIKE LOWER('{prefix}%')")
+
+        filter_sql = " OR ".join(conditions)
+
+        query = f"""
+        SELECT *
+        FROM violations
+        WHERE ({filter_sql})
+        ORDER BY "timestamp" DESC;
+        """
+
+        # query = 'SELECT * FROM violations ORDER BY "timestamp" DESC;'
+
+
+        df = pd.read_sql(text(query), engine)
+        print("This is the df in fetch violation fc : ", df)
         # df.columns = [c.lower() for c in df.columns]  # ✅ normalize names
         print(f"✅ Loaded {len(df)} violations from DB")
         return df
@@ -252,9 +326,12 @@ def fetch_parking_record(vehicle_no):
 
 def get_all_violations():
     """Fetch all violation records as a DataFrame."""
-    query = "SELECT * FROM violations"
+    base_query = "SELECT * FROM violations"
+    query = apply_society_filter(base_query)
+    # query = "SELECT * FROM violations"
     with get_connection() as conn:
         df = pd.read_sql(query, conn)
+        print("Works OK in get_all_violations 314: ", len(df))
     return df
 
 
@@ -716,35 +793,73 @@ def fetch_all_watchman_actions():
     Returns all watchman observations from watchman_actions table.
     Always uses SQLAlchemy engine for reads.
     """
+    # try:
+    #     with engine.connect() as conn:
+    #         df = pd.read_sql(
+    #             text("""
+    #                 SELECT
+    #                     wa.id AS action_id,
+    #                     wa.watchman_name,
+    #                     wa.action,
+    #                     wa.notes,
+    #                     wa.created_at,
+    #
+    #                     v.id AS violation_id,
+    #                     v.detected_number,
+    #                     v.parked_slot,
+    #                     v.allotted_slot,
+    #                     v."Status",
+    #                     v.fine,
+    #                     v.timestamp,
+    #                     v.image_path
+    #
+    #                 FROM watchman_actions wa
+    #                 LEFT JOIN violations v
+    #                     ON wa.violation_id = v.id
+    #                 ORDER BY wa.created_at DESC
+    #             """),
+    #             conn
+    #         )
+
     try:
         with engine.connect() as conn:
-            df = pd.read_sql(
-                text("""
-                    SELECT 
-                        wa.id AS action_id,
-                        wa.watchman_name,
-                        wa.action,
-                        wa.notes,
-                        wa.created_at,
-        
-                        v.id AS violation_id,
-                        v.detected_number,
-                        v.parked_slot,
-                        v.allotted_slot,
-                        v."Status",
-                        v.fine,
-                        v.timestamp,
-                        v.image_path 
-        
-                    FROM watchman_actions wa
-                    LEFT JOIN violations v
-                        ON wa.violation_id = v.id
-                    ORDER BY wa.created_at DESC
-                """),
-                conn
-            )
-        print("🔥 DB FETCH SUCCESS — ROWS:", len(df))
-        return df
+            base_query = """
+                SELECT 
+                    wa.id AS action_id,
+                    wa.watchman_name,
+                    wa.action,
+                    wa.notes,
+                    wa.created_at,
+
+                    v.id AS violation_id,
+                    v.detected_number,
+                    v.parked_slot,
+                    v.allotted_slot,
+                    v."Status",
+                    v.fine,
+                    v.timestamp,
+                    v.image_path,
+                    v."FlatNo"
+
+                FROM watchman_actions wa
+                LEFT JOIN violations v
+                    ON wa.violation_id = v.id
+            """
+
+            # Apply society filter on v."FlatNo"
+            # NOTE: apply_society_filter expects a query with "FlatNo" column;
+            # here that comes from the violations table.
+            base_query = apply_society_filter(base_query)
+
+            # Add ORDER BY after filter
+            full_query = base_query + " ORDER BY wa.created_at DESC"
+
+            df = pd.read_sql(text(full_query), conn)
+            print("Works OK in fetch_all_watchman_actions 778: ", len(df))
+
+
+            print("🔥 DB FETCH SUCCESS — ROWS:", len(df))
+            return df
 
     except Exception as e:
         print("❌ DB FETCH FAILED — USING EXCEL FALLBACK:", e)
@@ -782,27 +897,77 @@ def force_df_timestamps_to_ist(df, col='timestamp', fmt='%d-%b-%Y %H:%M'):
 
 
 # -------------------- Watchman Daily Entry helpers (ADD-ON) --------------------
+# def find_vehicle_by_last4(last4):
+#     """
+#     Returns a dict with vehicle details if found in parking_data table by last 4 digits.
+#     Returns None if not found.
+#     """
+#     try:
+#         conn = get_connection()
+#         cur = conn.cursor(cursor_factory=RealDictCursor)
+#         # Using ILIKE to be case-insensitive
+#         cur.execute("""
+#             SELECT *
+#             FROM parking_data
+#             WHERE RIGHT("VehicleNo", 4) ILIKE %s
+#             LIMIT 1;
+#         """, (last4,))
+#         row = cur.fetchone()
+#         conn.close()
+#         return row if row else None
+#     except Exception as e:
+#         print("⚠️ find_vehicle_by_last4 failed:", e)
+#         return None
+
 def find_vehicle_by_last4(last4):
     """
-    Returns a dict with vehicle details if found in parking_data table by last 4 digits.
-    Returns None if not found.
+    Returns a dict with vehicle details if found in parking_data table by last 4 digits,
+    scoped to the logged-in society via FlatNo prefixes.
     """
     try:
         conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        # Using ILIKE to be case-insensitive
-        cur.execute("""
+
+        # Base SELECT with WHERE (no semicolon, no ORDER/LIMIT)
+        base_query = """
             SELECT *
             FROM parking_data
             WHERE RIGHT("VehicleNo", 4) ILIKE %s
-            LIMIT 1;
-        """, (last4,))
+        """
+
+        # Apply society filter on FlatNo
+        # base_query = apply_society_filter(base_query)
+
+        # Add LIMIT at the end
+        query = base_query + " LIMIT 1"
+
+        cur.execute(query, (last4,))
         row = cur.fetchone()
+        print("Works OK find_vehicle_by_last4 989: ", row)
+
         conn.close()
-        return row if row else None
+
+        if not row:
+            return None
+
+        # 🔒 Validate that this vehicle belongs to CURRENT society
+        flat = row.get("FlatNo", "")
+        norm_flat = normalize_flat_no(flat)  # e.g. MAJESTY3005
+        tower_prefix = ''.join([c for c in norm_flat if c.isalpha()]).upper()
+
+        allowed = session.get("allowed_prefixes", [])
+
+        # If prefix doesn't match current society → block autofill
+        if tower_prefix not in [p.upper() for p in allowed]:
+            print("❌ Vehicle belongs to another society → Autofill blocked")
+            return None
+
+        return row
+
     except Exception as e:
         print("⚠️ find_vehicle_by_last4 failed:", e)
         return None
+
 
 # def log_watchman_entry(
 #     watchman_id=None,
@@ -895,14 +1060,30 @@ def find_parking_by_flat_normalized(raw_flat):
         conn = get_connection()
         cur = conn.cursor()
 
-        cur.execute("""
+        # cur.execute("""
+        #     SELECT "FlatNo", "ParkingSlot", "OwnerContact"
+        #     FROM parking_data
+        #     WHERE REGEXP_REPLACE("FlatNo", '[^A-Za-z0-9]+', '', 'g') =
+        #             REGEXP_REPLACE(%s, '[^A-Za-z0-9]+', '', 'g')
+        #     ORDER BY id DESC
+        #     LIMIT 1;
+        # """, (norm,))
+
+
+        base_query = """
             SELECT "FlatNo", "ParkingSlot", "OwnerContact"
             FROM parking_data
             WHERE REGEXP_REPLACE("FlatNo", '[^A-Za-z0-9]+', '', 'g') =
                     REGEXP_REPLACE(%s, '[^A-Za-z0-9]+', '', 'g')
-            ORDER BY id DESC
-            LIMIT 1;
-        """, (norm,))
+        """
+
+        # Apply society filter based on FlatNo
+        # base_query = apply_society_filter(base_query)
+
+        # Add ORDER BY + LIMIT after filtering
+        query = base_query + " ORDER BY id DESC LIMIT 1"
+
+        cur.execute(query, (norm,))
 
         row = cur.fetchone()
         print("row : ", row)
@@ -910,6 +1091,17 @@ def find_parking_by_flat_normalized(raw_flat):
         conn.close()
 
         if not row:
+            return None
+
+        # 🔒 Ensure this parking info belongs to current society
+        flat = row.get("FlatNo", "")
+        norm_flat = normalize_flat_no(flat)
+        tower_prefix = ''.join([c for c in norm_flat if c.isalpha()]).upper()
+
+        allowed = session.get("allowed_prefixes", [])
+
+        if tower_prefix not in [p.upper() for p in allowed]:
+            print("❌ Parking data belongs to another society → Autofill blocked")
             return None
 
         return {

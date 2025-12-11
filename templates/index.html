@@ -70,11 +70,25 @@
   </style>
 </head>
 <body>
+  {% if session.get('logged_in') %}
+  <div style="position: fixed; top: 12px; right: 15px; z-index: 1000;">
+      <a href="/society_logout"
+         style="padding: 8px 12px;
+                background: #c82333;
+                color: white;
+                font-size: 14px;
+                text-decoration: none;
+                border-radius: 6px;">
+          Society Logout
+      </a>
+  </div>
+  {% endif %}
+
   <div class="container py-5">
     <div class="hero mb-4">
       <div class="row align-items-center">
         <div class="col-lg-8">
-          <h1 class="h3 mb-1">TenX Habitat Parking Security Dashboard</h1>
+          <h1 class="h3 mb-1">{{ society_name }} Parking Security Dashboard</h1>
           <p class="small-muted mb-0">Capture unauthorized vehicle photos and notify society management.</p>
         </div>
         <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">

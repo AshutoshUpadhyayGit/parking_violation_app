@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Admin Dashboard — TenX Habitat</title>
+  <title>Admin Dashboard — {{ society_name }}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     body {
@@ -104,7 +104,7 @@
 <div class="container">
   <!-- Header -->
   <div class="d-flex justify-content-between align-items-center mt-4 mb-3 admin-header">
-    <h3 class="fw-bold text-primary">Admin Dashboard — TenX Habitat</h3>
+    <h3 class="fw-bold text-primary">Admin Dashboard — {{ society_name }}</h3>
     <div>
       <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm me-2">Home</a>
       <a href="{{ url_for('watchman_login') }}" class="btn btn-outline-success btn-sm me-2">Watchman Panel</a>
@@ -179,10 +179,37 @@
             <label class="form-label">Owner Name</label>
             <input type="text" class="form-control" name="owner_name" id="owner_name" placeholder="Enter owner name">
           </div>
+<!--          <div class="mb-3">-->
+<!--            <label class="form-label">Flat No</label>-->
+<!--            <input type="text" class="form-control" name="flat_no" id="flat_no" placeholder="e.g. B-302">-->
+<!--          </div>-->
+          <!-- NEW: Tower + Flat Number Fields -->
           <div class="mb-3">
             <label class="form-label">Flat No</label>
-            <input type="text" class="form-control" name="flat_no" id="flat_no" placeholder="e.g. B-302">
+
+            <div class="row g-2">
+                <div class="col-5">
+                    <!-- Tower dropdown (values injected via Jinja from session allowed prefixes) -->
+                    <select id="tower_assign" class="form-select">
+                        {% for t in session.allowed_prefixes %}
+                            <option value="{{ t }}">{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-7">
+                    <!-- Flat number text box -->
+                    <input id="flatNumber_assign"
+                           type="text"
+                           class="form-control"
+                           placeholder="302">
+                </div>
+            </div>
+
+            <!-- Hidden actual combined flat number -->
+            <input type="hidden" name="flat_no" id="flat_no">
           </div>
+
           <div class="mb-3">
             <label class="form-label">Allotted Slot</label>
             <input type="text" class="form-control" name="slot" id="slot" placeholder="e.g. P5">
@@ -251,14 +278,34 @@
 
 
 
+<!--          <div class="mb-3">-->
+<!--            <label class="form-label">Flat No</label>-->
+<!--            <input type="text" class="form-control"-->
+<!--                   name="flat_no"-->
+<!--                   id="flat_no_register"-->
+<!--                   required-->
+<!--                   placeholder="VISTA-3206 / VISITOR">-->
+<!--          </div>-->
+
           <div class="mb-3">
-            <label class="form-label">Flat No</label>
-            <input type="text" class="form-control"
-                   name="flat_no"
-                   id="flat_no_register"
-                   required
-                   placeholder="VISTA-3206 / VISITOR">
+              <label class="form-label">Flat No (Tower)</label>
+              <select class="form-select"
+                      name="tower_prefix"
+                      id="tower_prefix_register"
+                      required>
+                  <option value="">Select Tower</option>
+                  {% for prefix in session.allowed_prefixes %}
+                      <option value="{{ prefix }}">{{ prefix }}</option>
+                  {% endfor %}
+              </select>
+
+              <input type="text" class="form-control mt-2"
+                     name="flat_no"
+                     id="flat_no_register"
+                     required
+                     placeholder="Enter flat number, e.g. 3206">
           </div>
+
 
           <div class="mb-3">
             <label class="form-label">Vehicle Type</label>
@@ -620,6 +667,7 @@ async function assignOrClamp(id, vehicle, parked_slot) {
     } else {
       alert(data.message || "Operation done");
     }
+    const SOCIETY_NAME = "{{ society_name }}";
 
     // -------------------------------------------
     // ONLY SEND WHATSAPP IF VEHICLE IS REGISTERED
@@ -644,7 +692,7 @@ async function assignOrClamp(id, vehicle, parked_slot) {
       const imageUrls = Array.isArray(data.images) ? data.images : [];
 
       let lines = [];
-      lines.push(" *TenX Habitat — Parking Violation* ");
+      lines.push(" ${SOCIETY_NAME} — Parking Violation* ");
       lines.push("");
       lines.push(`*Vehicle :* ${data.vehicle_no}`);
       lines.push(`*Owner :* ${data.owner}`);
@@ -671,7 +719,7 @@ async function assignOrClamp(id, vehicle, parked_slot) {
       }
 
       lines.push("Thank You,");
-      lines.push("TenX Parking Security");
+      lines.push("${SOCIETY_NAME} Parking Security");
 
       const finalText = encodeURIComponent(lines.join("\n"));
 
@@ -736,7 +784,7 @@ async function verifyAndNotify(id) {
     // Build WhatsApp message
     let lines = [];
 
-    lines.push(" *TenX Habitat — Parking Violation Notice* ");
+    lines.push(" *${SOCIETY_NAME} — Parking Violation Notice* ");
     lines.push("");
     lines.push(`*Vehicle :* ${data.vehicle_no}`);
     lines.push(`*Owner :* ${data.owner}`);
@@ -760,7 +808,7 @@ async function verifyAndNotify(id) {
     }
 
     lines.push("Thank You,");
-    lines.push("TenX Parking Security");
+    lines.push("${SOCIETY_NAME} Parking Security");
 
 <!--    // Append direct image URLs (WhatsApp will try to render previews; keep this optional)-->
 <!--    // If you want the message to show image previews inline, append direct image URLs.-->
@@ -793,6 +841,27 @@ async function verifyAndNotify(id) {
     setTimeout(() => location.reload(), 700);
   }
 }
+
+// --- Bind Tower + Flat Number → hidden flat_no field ---
+function bindFlatAssign() {
+    let tower = document.getElementById("tower_assign");
+    let number = document.getElementById("flatNumber_assign");
+    let hidden = document.getElementById("flat_no");
+
+    if (!tower || !number || !hidden) return;
+
+    number.addEventListener("input", function () {
+        hidden.value = tower.value + "-" + number.value.replace(/\s+/g, '');
+    });
+
+    tower.addEventListener("change", function () {
+        hidden.value = tower.value + "-" + (number.value || "");
+    });
+}
+
+// Run after modal loads
+document.addEventListener("DOMContentLoaded", bindFlatAssign);
+
 </script>
 
 

@@ -122,7 +122,22 @@
               <div class="mb-3">
                 <label>Flat To Visit</label>
                 <div class="input-group mb-2">
-                    <input type="text" id="flatToVisit" class="form-control" placeholder="e.g., Vista-3005">
+                    <div style="display:flex;gap:8px;align-items:center;">
+
+                        <!-- Tower Dropdown -->
+                        <select id="tower_flatToVisit" class="form-control" style="max-width:120px;">
+                            {% for t in session.get('allowed_prefixes', []) %}
+                                <option value="{{ t }}">{{ t }}</option>
+                            {% endfor %}
+                        </select>
+
+                        <!-- Flat Number Only -->
+                        <input type="text" id="flatNumber_flatToVisit" class="form-control" placeholder="3005" style="max-width:100px;">
+
+                        <!-- Hidden field that JS will read exactly like before -->
+                        <input type="hidden" id="flatToVisit" name="FlatNo">
+                    </div>
+
                     <button class="btn btn-outline-secondary" id="fetchOwnerBtn" type="button">✔</button>
                 </div>
 
@@ -219,7 +234,19 @@
 <!--            </div>-->
 
             <div class="input-group mb-2 mt-2">
-                <input type="text" id="personFlatToVisit" class="form-control" placeholder="e.g., Vista-3005">
+                <div style="display:flex;gap:8px;align-items:center;">
+
+                    <select id="tower_personFlatToVisit" class="form-control" style="max-width:120px;">
+                        {% for t in session.get('allowed_prefixes', []) %}
+                            <option value="{{ t }}">{{ t }}</option>
+                        {% endfor %}
+                    </select>
+
+                    <input type="text" id="flatNumber_personFlatToVisit" class="form-control" placeholder="3005" style="max-width:100px;">
+
+                    <input type="hidden" id="personFlatToVisit" name="FlatNo">
+                </div>
+
                 <button class="btn btn-outline-secondary" id="fetchOwnerBtnPerson" type="button">✔</button>
             </div>
 
@@ -305,6 +332,31 @@
       </div>
     </div>
   </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+
+    function bindFlat(builderId) {
+        let tower = document.getElementById("tower_" + builderId);
+        let number = document.getElementById("flatNumber_" + builderId);
+        let hidden = document.getElementById(builderId);
+
+        if (!tower || !number || !hidden) return;
+
+        number.addEventListener("input", function() {
+            hidden.value = tower.value + "-" + number.value.replace(/\s+/g, '');
+        });
+
+        tower.addEventListener("change", function() {
+            hidden.value = tower.value + "-" + (number.value || "");
+        });
+    }
+
+    bindFlat("flatToVisit");
+    bindFlat("personFlatToVisit");
+
+});
+</script>
 
 </body>
 </html>
