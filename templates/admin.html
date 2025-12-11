@@ -692,7 +692,7 @@ async function assignOrClamp(id, vehicle, parked_slot) {
       const imageUrls = Array.isArray(data.images) ? data.images : [];
 
       let lines = [];
-      lines.push(" ${SOCIETY_NAME} — Parking Violation* ");
+      lines.push(` ${SOCIETY_NAME} — Parking Violation* `);
       lines.push("");
       lines.push(`*Vehicle :* ${data.vehicle_no}`);
       lines.push(`*Owner :* ${data.owner}`);
@@ -719,7 +719,7 @@ async function assignOrClamp(id, vehicle, parked_slot) {
       }
 
       lines.push("Thank You,");
-      lines.push("${SOCIETY_NAME} Parking Security");
+      lines.push(`${SOCIETY_NAME} Parking Security`);
 
       const finalText = encodeURIComponent(lines.join("\n"));
 
@@ -784,7 +784,7 @@ async function verifyAndNotify(id) {
     // Build WhatsApp message
     let lines = [];
 
-    lines.push(" *${SOCIETY_NAME} — Parking Violation Notice* ");
+    lines.push(` *${SOCIETY_NAME} — Parking Violation Notice* `);
     lines.push("");
     lines.push(`*Vehicle :* ${data.vehicle_no}`);
     lines.push(`*Owner :* ${data.owner}`);
@@ -808,7 +808,7 @@ async function verifyAndNotify(id) {
     }
 
     lines.push("Thank You,");
-    lines.push("${SOCIETY_NAME} Parking Security");
+    lines.push(` ${SOCIETY_NAME} Parking Security`);
 
 <!--    // Append direct image URLs (WhatsApp will try to render previews; keep this optional)-->
 <!--    // If you want the message to show image previews inline, append direct image URLs.-->
