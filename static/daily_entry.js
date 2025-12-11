@@ -291,7 +291,7 @@ window.__dailyEntryInit = true;
         const imageUrl = previewImg && previewImg.src ? previewImg.src : null;
 
         // 📝 Build dynamic message
-        let msg = `   🚨 *TenX Security - VISITOR Alert !!!* \n\n`;
+        let msg = ` 🚨  *${window.SOCIETY_NAME} Security - VISITOR Alert !!!* \n\n`;
 
         msg += `   *Approve (Y) or Reject (N) - As Visitor is waiting* \n\n`;
 
@@ -304,7 +304,19 @@ window.__dailyEntryInit = true;
             msg += `*Visitor:* ${personName.value || "-"}\n`;
         }
 
-        msg += `*Purpose:* ${purposeSelect.value}${visitType.value ? " - " + visitType.value : ""}\n`;
+//        msg += `*Purpose:* ${purposeSelect.value}${visitType.value ? " - " + visitType.value : ""}\n`;
+        // --- Purpose line (handle Vehicle vs Person) ---
+        if (entryType.value === "Vehicle") {
+            msg += `*Purpose:* ${purposeSelect.value}${visitType.value ? " - " + visitType.value : ""}\n`;
+        } else {
+            // Person entry: use personCategory and if 'Other' include personOtherDescription
+            const personPurpose = personCategory.value || "Person";
+            const personSubtype = (personPurpose === "Other" && personOtherDescription.value)
+                                  ? personOtherDescription.value
+                                  : personPurpose;
+            msg += `*Purpose:* ${personPurpose}${personSubtype ? " - " + personSubtype : ""}\n`;
+        }
+
         msg += `*Parking Slot:* ${info.parking_slot || "-"}\n`;
         msg += `*Date:* ${dateStr}\n`;
         msg += `*Time:* ${timeStr}\n\n`;

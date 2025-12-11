@@ -1351,7 +1351,7 @@ def admin_actioned():
         # ✅ Step 1: Try fetching from Supabase / DB first
         try:
             df = fetch_violations_from_db()  # your existing DB fetch helper
-            print("df in actioned table : ", df)
+            print("df in actioned table : ", df.to_dict(orient='records'))
             print("df: ", df.columns)
             if not df.empty:
                 df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
