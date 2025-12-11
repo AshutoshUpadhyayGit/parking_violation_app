@@ -186,6 +186,8 @@ def log_violation(record):
     """
     try:
         print("🟢 Logging violation record to Violation Table:", record)
+        # ALWAYS define default first
+        flat_insert_value = record.get("FlatNo", "UNKNOWN")
 
         # ⭐⭐⭐ ADD THIS BLOCK ⭐⭐⭐
         # Normalize FlatNo for UNKNOWN cases
