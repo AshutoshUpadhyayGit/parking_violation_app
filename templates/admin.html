@@ -642,6 +642,7 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 </script>
 <script>
+const SOCIETY_NAME = "{{ society_name }}";
 async function assignOrClamp(id, vehicle, parked_slot) {
   if (!vehicle) return;
   if (!confirm(`Proceed to Assign/Clamp ${vehicle}?`)) return;
@@ -667,7 +668,7 @@ async function assignOrClamp(id, vehicle, parked_slot) {
     } else {
       alert(data.message || "Operation done");
     }
-    const SOCIETY_NAME = "{{ society_name }}";
+    
 
     // -------------------------------------------
     // ONLY SEND WHATSAPP IF VEHICLE IS REGISTERED
@@ -748,6 +749,7 @@ async function assignOrClamp(id, vehicle, parked_slot) {
 
 
 <script>
+const SOCIETY_NAME = "{{ society_name }}";
 async function verifyAndNotify(id) {
   try {
     showSmoothPopup('Verifying record and preparing WhatsApp...', 'primary');
